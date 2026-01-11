@@ -294,7 +294,7 @@ const KPKFloodRelay = () => {
         </div>
 
         <div className="mt-6 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-lg shadow-lg p-6">
-          <h3 className="text-xl font-bold mb-3">How KPK-FloodRelay Works</h3>
+          <h3 className="text-xl font-bold mb-3">How Ailaan Works</h3>
           <div className="grid md:grid-cols-3 gap-4 text-sm">
             <div>
               <p className="font-semibold mb-1">1. Data Collection</p>
