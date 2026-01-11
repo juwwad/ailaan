@@ -1,0 +1,15 @@
+{
+  "files": {
+    "main.css": "/ailaan/static/css/main.5fa91606.css",
+    "main.js": "/ailaan/static/js/main.0548b73f.js",
+    "static/js/453.95b2a536.chunk.js": "/ailaan/static/js/453.95b2a536.chunk.js",
+    "index.html": "/ailaan/index.html",
+    "main.5fa91606.css.map": "/ailaan/static/css/main.5fa91606.css.map",
+    "main.0548b73f.js.map": "/ailaan/static/js/main.0548b73f.js.map",
+    "453.95b2a536.chunk.js.map": "/ailaan/static/js/453.95b2a536.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.5fa91606.css",
+    "static/js/main.0548b73f.js"
+  ]
+}
