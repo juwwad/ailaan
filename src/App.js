@@ -1,5 +1,37 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AlertTriangle, Droplets, MapPin, Send, Volume2, Clock, Users, Phone } from 'lucide-react';
+import { getFloodStatusByArea, processFloodData } from './services/floodAPI';
+
+const STATS_STORAGE_KEY = 'ailaan_system_stats_v1';
+const STATS_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+const getInitialSystemStats = () => {
+  const now = Date.now();
+
+  if (typeof window === 'undefined') {
+    return { windowStart: now, alertsSentToday: 0, subscribers: 0 };
+  }
+
+  try {
+    const stored = window.localStorage.getItem(STATS_STORAGE_KEY);
+    if (!stored) {
+      return { windowStart: now, alertsSentToday: 0, subscribers: 0 };
+    }
+
+    const parsed = JSON.parse(stored);
+    const windowStart = Number(parsed.windowStart) || now;
+    const subscribers = Number(parsed.subscribers) || 0;
+    const alertsSentToday = Number(parsed.alertsSentToday) || 0;
+
+    if (now - windowStart >= STATS_WINDOW_MS) {
+      return { windowStart: now, alertsSentToday: 0, subscribers };
+    }
+
+    return { windowStart, alertsSentToday, subscribers };
+  } catch {
+    return { windowStart: now, alertsSentToday: 0, subscribers: 0 };
+  }
+};
 
 const KPKFloodRelay = () => {
   const [selectedDistrict, setSelectedDistrict] = useState('nowshera');
@@ -8,6 +40,9 @@ const KPKFloodRelay = () => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [subscribed, setSubscribed] = useState(false);
   const [language, setLanguage] = useState('both');
+  const [error, setError] = useState(null);
+  const [lastFetch, setLastFetch] = useState({});
+  const [systemStats, setSystemStats] = useState(getInitialSystemStats);
 
   const districts = {
     nowshera: { name: 'Nowshera', river: 'Kabul River', risk: 'high', discharge: 450000 },
@@ -17,61 +52,145 @@ const KPKFloodRelay = () => {
     mardan: { name: 'Mardan', river: 'Kalpani River', risk: 'low', discharge: 150000 }
   };
 
-  const generateAlert = async (district) => {
-    setLoading(true);
+  const [districtRisks, setDistrictRisks] = useState(
+    Object.fromEntries(Object.keys(districts).map((key) => [key, null]))
+  );
+
+  useEffect(() => {
+    window.localStorage.setItem(STATS_STORAGE_KEY, JSON.stringify(systemStats));
+  }, [systemStats]);
+
+  const normalizeRisk = (risk) => {
+    const value = String(risk || '').toLowerCase();
+    if (value === 'high' || value === 'medium' || value === 'low') {
+      return value;
+    }
+    return 'low';
+  };
+
+const generateAlert = async (district) => {
+  // Check if we fetched this district in the last hour
+  const now = Date.now();
+  if (lastFetch[district] && (now - lastFetch[district] < 3600000)) { // 1 hour
+    alert('Data was fetched recently. Please wait before refreshing.');
+    return;
+  }
+  setLoading(true);
+  setError(null);
+  
+  try {
+    // 1. Fetch real flood data from Google API
+    const floodStatuses = await getFloodStatusByArea(district);
     
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    // 2. Process the data
+    const processedData = processFloodData(floodStatuses);
     
+    // 3. If no data, show message
+    if (!processedData) {
+      alert(`No flood data available for ${districts[district].name} at this time.`);
+      setLoading(false);
+      return;
+    }
+    
+    // 4. Get district data
     const data = districts[district];
+    
+    // 5. Determine risk level from API data
+    const riskLevel = normalizeRisk(processedData.severity);
+    
+    // 6. Generate localized alerts based on real risk level
     const alertTemplates = {
       high: {
         english: `URGENT ALERT for ${data.name}: The ${data.river} is rising VERY FAST and will overflow by Maghrib prayers (around 6pm). Water will reach 3 feet above normal - knee to waist deep in low areas. Move your cattle and family to the GT Road bypass NOW. You have only 3 hours.`,
         pashto: `${data.name} ته خطرناک خبرداری: ${data.river} ډېره ګړندۍ لوړېږي او د مغرب لمانځه (شاوخوا 6 بجے) پورې به یې اوبه راځي. اوبه به د معمول څخه 3 فټه لوړې وي - ټیټو سیمو کې د زنګون څخه تر کمر پورې. خپل څاروي او کورنۍ همدا اوس جي ټي روډ بای پاس ته ولیږدئ. تاسو ته یوازې 3 ساعته وخت دی.`,
-        roman: `${data.name} ta khatarnak khabardari: ${data.river} dera zar zar ra dakegi aw da makham manza (shawkhuwa 6 baje) pore ba ye obah bahar ta ra ozi. Obah ba da mamool na 3 foot lware wi - teto seemo ke da zangoon na wala tar kamar pore. Khpal sarwi aw da kor khalak GT Road bypass ta walegay. Taso sara serf 3 ghenty wakht day.`,
-        audio: `السلام علیکم! ${data.name} ورونو او خویندو! ${data.river} ډېره ګړندۍ لوړېږي. د مغرب لمانځه پورې به ستاسو کلي ته اوبه راشي. اوبه به د زنګون څخه تر کمر پورې وي. مهرباني وکړئ همدا اوس خپل څاروي، ماشومان او بوډاګان جي ټي روډ ته ولیږدئ. تاسو ته یوازې 3 ساعته وخت پاتې دی. الله پاماني!`,
-        audioRoman: `Assalam-o-Alaikum! ${data.name} wrono aw khwendo! ${data.river} dera ghrandai loredzi. Da Maghrib lamanze pore ba staaso kali ta obah rashi. Obah ba da zangoon na wala tar kamar pore wi. Mehrbani okray hamda os khpal tsarwi, mashooman aw boodagan GT Road ta walegday. Taso ta yawaze 3 ghenty waqt pate day. Allah pamanai!`
+        roman: `${data.name} ta khatarnak khabardari: ${data.river} dera ghrandai loredzi aw da maghrib lamanze (shawkhuwa 6 baje) pore ba ye obah razi. Obah ba da mamool tsokh 3 foot lware wi - teto seemo ke da zangoon tsokh tar kamar pore. Khpal tsarwi aw koranai hamda os GT Road bypass ta walegday. Taso ta yawaze 3 sa'ata waqt day.`,
+        audio: `السلام علیکم! ${data.name} ورونو او خویندو! ${data.river} ډېره ګړندۍ لوړېږي. د مغرب لمانځه پورې به ستاسو کلي ته اوبه راشي...`,
+        audioRoman: `Assalam-o-Alaikum! ${data.name} wrono aw khwendo! ${data.river} dera ghrandai loredzi...`
       },
       medium: {
-        english: `WARNING for ${data.name}: The ${data.river} water is rising. By tomorrow morning (Fajr time), water may reach the lower fields near the river. Move your cattle from riverbank areas to higher ground near the main bazaar. You have 6-8 hours. Keep children away from the river.`,
-        pashto: `${data.name} ته خبرداری: ${data.river} اوبه لوړېږي. سبا د سهار د فجر په وخت کې، اوبه ممکن د سیند سره نژدې ټیټو کروندو ته ورسېږي. خپل څاروي د سیند غاړې څخه لوړې ځمکې ته د اصلي بازار سره نژدې ولیږدئ. تاسو ته 6-8 ساعته وخت دی. ماشومان د سیند څخه لرې وساتئ.`,
-        roman: `${data.name} ta khabardari: ${data.river} obah ra lwaregi. Saba da sahar da munz pa wakht ke, obah mumkin da sind sara nazdey teto korona ao pato ta warshi. Khpal sarwi da sind ghare na lware zmake ta da asli bazar sara nazdey walegay. Taso sara 6-8 ghenty wakht day. Mashooman da sind na lere wasatay.`,
-        audio: `السلام علیکم! ${data.name} ورونو! ${data.river} اوبه لوړېږي. سبا د سهار د فجر په وخت کې به ستاسو ټیټو کروندو ته اوبه راشي. مهرباني وکړئ خپل غوایي، اوښان او وزې د سیند غاړې څخه بازار ته ولیږدئ. تاسو ته شپږ یا اته ساعته وخت لرئ. ماشومان د سیند څخه لرې وساتئ.`,
-        audioRoman: `Assalam-o-Alaikum! ${data.name} wrono! ${data.river} obah loredzi. Saba da sahar da Fajr pa waqt ke ba staaso teto krondo ta obah rashi. Mehrbani okray khpal ghwayi, oshan aw waze da sind ghare tsokh bazar ta walegday. Taso ta shpag ya ata ghenty waqt lare. Mashooman da sind tsokh lere wasatay.`
+        english: `Flood WARNING for ${data.name}: The ${data.river} is rising and low-lying areas may flood within the next 6 to 12 hours. Keep your emergency items ready and move livestock to higher ground if water levels continue to increase.`,
+        pashto: `${data.name} لپاره د سېلاب خبرداری: ${data.river} اوبه لوړېږي او ټیټې سیمې د راتلونکو 6 تر 12 ساعتونو کې تر اوبو لاندې کېدای شي. د بیړني حالت سامان چمتو وساتئ او که اوبه نورې هم لوړېږي نو څاروي لوړو ځایونو ته انتقال کړئ.`,
+        roman: `${data.name} lapara da selab khabardari: ${data.river} obah lwaregi aw teto seeme da ratlonko 6 تر 12 sa'ato ke tar obo lande keday shi. Da beyrani halat saman chمتo وساتئ aw ka obah nore ham lwaregi نو tsarwi loro zayoono ta intiqal krei.`,
+        audio: `السلام علیکم! ${data.name} کې د سېلاب منځنی خطر شته. مهرباني وکړئ چمتووالی ونیسئ او ټیټې سیمې پرېږدئ که اوبه نورې هم لوړېږي.`,
+        audioRoman: `Assalam-o-Alaikum! ${data.name} ke da selab manzani khatar شته. Mehrabani wakri chamtowalay waneesai aw teto seeme preghdai ka obah nore ham lwaregi.`
       },
       low: {
-        english: `UPDATE for ${data.name}: The ${data.river} is flowing normally today. No danger right now. But keep watching - if it rains heavily in the mountains, water can rise quickly. Safe to work in fields near river, but stay alert.`,
-        pashto: `${data.name} ته تازه خبر: ${data.river} نن په نورماله توګه بهېږي. اوس مهال کومه خطره نشته. خو څارنه وکړئ - که په غرونو کې ډېره باران وشي، اوبه ګړندۍ لوړېدای شي. د سیند سره نژدې کروندو کې کار کول خوندي دي، خو هوښیار اوسئ.`,
-        roman: `${data.name} ta taza khabar: ${data.river} nan pa normal toga bahegi. Os la sa kuma khatara nashta. Kho sarana kawai - ka pa gharuno ke der baran washi, obah zar zar ratlay shi. Da sind sara nazdey korono ao pato ke kar kawul mahfooza di, kho hokhyar osay.`,
-        audio: `السلام علیکم! ${data.name} ورونو! ${data.river} نن نورمال دی. اوس مهال کومه خطره نشته. تاسو کولای شئ په خپلو کروندو کې کار وکړئ. خو هوښیار اوسئ - که په غرونو کې باران وشي، نو اوبه ګړندۍ راځي. الله مو ساتونکی وي.`,
-        audioRoman: `Assalam-o-Alaikum! ${data.name} wrono! ${data.river} nan normal day. Os mahal kuma khatara nashta. Taso kawlay shay pa khplo krondo ke kar wukray. Kho hoshyar osay - ka pa gharuno ke baran washi, no obah ghrandai razi. Allah mo satonkay wi.`
+        english: `Update for ${data.name}: Flood risk is currently LOW on the ${data.river}. Stay aware, monitor official updates, and keep your family emergency contacts ready as a precaution.`,
+        pashto: `${data.name} تازه معلومات: د ${data.river} په اوږدو کې اوس مهال د سېلاب خطر کم دی. خبرتیاوې تعقیب کړئ او د احتیاط لپاره د کورنۍ بیړني اړیکې تیارې وساتئ.`,
+        roman: `${data.name} taza maloomat: da ${data.river} pa ogdo ke os mahal da selab khatar kam day. Khabartyawi tawqub krei aw da ihtiyat lapara da کورنۍ beyrani arike tayare وساتئ.`,
+        audio: `السلام علیکم! ${data.name} کې د سېلاب خطر اوس کم دی، خو مهرباني وکړئ رسمي خبرتیاوې تعقیب کړئ.`,
+        audioRoman: `Assalam-o-Alaikum! ${data.name} ke da selab khatar os kam day, kho mehrabani wakri rasmi khabartyawi taqub krei.`
       }
     };
+
+    const selectedTemplate = alertTemplates[riskLevel] || alertTemplates.low;
     
+    // 7. Create alert with real data
     const newAlert = {
       id: Date.now(),
+      createdAt: now,
       district: data.name,
       river: data.river,
-      risk: data.risk,
-      discharge: data.discharge,
+      risk: riskLevel,
+      discharge: data.discharge, // You could calculate this from API data if available
       timestamp: new Date().toLocaleString(),
-      ...alertTemplates[data.risk]
+      apiData: processedData, // Include raw API data
+      ...selectedTemplate
     };
     
     setAlerts(prev => [newAlert, ...prev]);
-    setLoading(false);
-  };
+    setDistrictRisks(prev => ({ ...prev, [district]: riskLevel }));
+    setLastFetch(prev => ({ ...prev, [district]: now }));
+    setSystemStats((prev) => {
+      const currentTime = Date.now();
+      const expired = currentTime - prev.windowStart >= STATS_WINDOW_MS;
+      const base = expired
+        ? { ...prev, windowStart: currentTime, alertsSentToday: 0 }
+        : prev;
+
+      return { ...base, alertsSentToday: base.alertsSentToday + 1 };
+    });
+    
+  } catch (error) {
+    console.error('Error generating alert:', error);
+    setError('Failed to fetch flood data. Please check your internet connection and try again.');
+  }
+  
+  setLoading(false);
+};
 
   const handleSubscribe = () => {
-    if (phoneNumber.length >= 10) {
-      setSubscribed(true);
-      setTimeout(() => {
-        alert(`✓ Subscribed! You'll receive WhatsApp alerts for ${districts[selectedDistrict].name}`);
-      }, 500);
+    if (subscribed) {
+      return;
     }
+
+    if (phoneNumber.length < 10) {
+      setError('Please enter a valid phone number to subscribe.');
+      return;
+    }
+
+    setError(null);
+    setSubscribed(true);
+    setSystemStats((prev) => ({ ...prev, subscribers: prev.subscribers + 1 }));
   };
 
-  const playAudioAlert = (text) => {
-    alert(`🔊 Audio Alert (Pashto):\n\n${text}`);
+  const playAudioAlert = (message) => {
+    if (!message) {
+      setError('No audio alert message is available.');
+      return;
+    }
+
+    if (!('speechSynthesis' in window)) {
+      setError('Audio playback is not supported in this browser.');
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(message);
+    utterance.rate = 0.9;
+    utterance.pitch = 1;
+    utterance.volume = 1;
+    window.speechSynthesis.speak(utterance);
   };
 
   const getRiskColor = (risk) => {
@@ -92,9 +211,20 @@ const KPKFloodRelay = () => {
     }
   };
 
+  const currentDistrictRisk = districtRisks[selectedDistrict];
+  const activeDistrictsCount = Object.keys(districts).length;
+  const subscriberCount = systemStats.subscribers;
+  const alertsSentToday = systemStats.alertsSentToday;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-cyan-50 p-4">
       <div className="max-w-6xl mx-auto">
+        {error && (
+          <div className="bg-red-100 border-l-4 border-red-500 p-4 rounded mb-4">
+            <p className="text-red-900">{error}</p>
+          </div>
+        )}
+
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
           <div className="flex items-center gap-3 mb-2">
             <Droplets className="w-10 h-10 text-blue-600" />
@@ -129,8 +259,8 @@ const KPKFloodRelay = () => {
             <div className="mb-4 p-4 bg-gray-50 rounded-lg">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm text-gray-600">Current Risk Level:</span>
-                <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${getRiskBadge(districts[selectedDistrict].risk)}`}>
-                  {districts[selectedDistrict].risk}
+                <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${getRiskBadge(currentDistrictRisk || 'unknown')}`}>
+                  {currentDistrictRisk || '--'}
                 </span>
               </div>
               <div className="text-sm text-gray-600">
@@ -216,15 +346,15 @@ const KPKFloodRelay = () => {
             <div className="space-y-3">
               <div className="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
                 <span className="text-sm text-gray-600">Active Districts</span>
-                <span className="text-xl font-bold text-purple-600">5</span>
+                <span className="text-xl font-bold text-purple-600">{activeDistrictsCount}</span>
               </div>
               <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
                 <span className="text-sm text-gray-600">Subscribers</span>
-                <span className="text-xl font-bold text-blue-600">2,847</span>
+                <span className="text-xl font-bold text-blue-600">{subscriberCount.toLocaleString()}</span>
               </div>
               <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
                 <span className="text-sm text-gray-600">Alerts Sent Today</span>
-                <span className="text-xl font-bold text-green-600">124</span>
+                <span className="text-xl font-bold text-green-600">{alertsSentToday.toLocaleString()}</span>
               </div>
             </div>
           </div>
