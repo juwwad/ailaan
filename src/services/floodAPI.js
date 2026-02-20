@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Point to your backend instead of Google directly
-const BACKEND_URL = 'ailaan-backend-production.up.railway.app';
+const BACKEND_URL = 'https://ailaan-backend-production.up.railway.app';
 
 const DISTRICT_COORDINATES = {
   nowshera: { lat: 34.0153, lng: 71.9747 },
