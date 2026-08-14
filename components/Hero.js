@@ -267,7 +267,7 @@ export default function Hero() {
             <h1 className="text-[clamp(1.35rem,5.6vw,3.1rem)] font-extrabold leading-[1.08] tracking-tight text-mist">
               &ldquo;450,000 cusecs&rdquo; means nothing.{" "}
               <span className="text-signal-soft">
-                &ldquo;Water at your knees by Maghrib&rdquo;
+                &ldquo;Makham pore tar khpo khpo oba&rdquo;
               </span>{" "}
               means everything.
             </h1>
