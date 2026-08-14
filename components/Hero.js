@@ -129,15 +129,18 @@ export default function Hero() {
         body: JSON.stringify({ district: key, coordinates: [] })
       });
       
+      const responseData = await response.json();
+      console.log('API Response:', responseData);
+      
       if (response.ok) {
-        const data = await response.json();
         const d = DISTRICTS.find((x) => x.key === key);
-        return { status: "ready", alert: buildAlert({ ...d, ...data }) };
+        return { status: "ready", alert: buildAlert({ ...d, ...responseData }) };
       } else {
-        throw new Error('API request failed');
+        console.error('API Error:', responseData);
+        throw new Error(responseData.error || 'API request failed');
       }
     } catch (error) {
-      console.warn('Real data unavailable, using mock data:', error);
+      console.warn('Real data unavailable, using mock data:', error.message);
       const d = DISTRICTS.find((x) => x.key === key);
       return { status: "ready", alert: buildAlert(d) };
     }
