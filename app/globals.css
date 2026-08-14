@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+:root {
+  --ink: #060d1a;
+  --ink-soft: #0a1628;
+  --mist: #eef3f8;
+  --signal: #3fc6f0;
+  --signal-soft: #8fe1f7;
+  --risk-high: #ef4a3d;
+  --risk-medium: #f2a93b;
+  --risk-low: #35d399;
+}
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-mist: var(--mist);
+  --color-signal: var(--signal);
+  --color-signal-soft: var(--signal-soft);
+  --color-risk-high: var(--risk-high);
+  --color-risk-medium: var(--risk-medium);
+  --color-risk-low: var(--risk-low);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html,
+body {
+  height: 100%;
+  overscroll-behavior: none;
+}
+
+body {
+  background: var(--ink);
+  color: var(--mist);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ring-color) 55%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 18px color-mix(in srgb, var(--ring-color) 0%, transparent);
+  }
+}
+.risk-pulse {
+  animation: pulse-ring 2.2s cubic-bezier(0.2, 0.7, 0.3, 1) infinite;
+}
+
+@keyframes rise {
+  0% {
+    transform: translateY(6px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.animate-rise {
+  animation: rise 0.4s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .risk-pulse,
+  .animate-rise {
+    animation: none !important;
+  }
+}

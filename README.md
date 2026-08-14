@@ -1,263 +1,49 @@
-# 🌊 Ailaan - AI-Powered Flood Alert System
+# Ailaan — Next.js Hero Rebuild
 
-**Ailaan** (اعلان - "Announcement" in Urdu/Pashto) is an intelligent flood early warning system designed specifically for Khyber Pakhtunkhwa, Pakistan. It transforms complex technical flood data into simple, actionable warnings in local dialects that save lives.
+A single-viewport, no-scroll hero for Ailaan, the AI-powered flood alert
+system for Khyber Pakhtunkhwa. Rebuilt in Next.js (App Router) with a
+glassmorphic UI and an embedded live demo of the actual product concept.
 
-![Ailaan App](https://img.shields.io/badge/Status-Active-success) ![React](https://img.shields.io/badge/React-18.0-blue) ![License](https://img.shields.io/badge/License-MIT-green)
+## Stack
+- Next.js 16 (App Router, Turbopack)
+- Tailwind CSS v4
+- `geist` (self-hosted Geist Sans + Geist Mono - no Google Fonts network call)
+- `lucide-react` for icons (the GitHub mark is a hand-drawn inline SVG,
+  since brand logos were removed from recent lucide-react versions)
 
-🔗 **Live Demo:** [https://juwwad.github.io/ailaan](https://juwwad.github.io/ailaan)
+## What's here
+- `app/layout.js` - fonts, metadata, locks page-level scroll
+- `app/page.js` - thin wrapper that renders the hero
+- `components/Hero.js` - everything: background, header, copy, CTA, and the
+  interactive glass demo card (district picker, risk indicator, language
+  toggle, text-to-speech playback, WhatsApp subscribe)
+- `app/globals.css` - color tokens, glass/pulse/rise utility classes
+- `public/logo.webp`, `public/hero-bg.webp` - your provided assets
 
----
+## Design notes
+- **No scroll, both breakpoints:** the hero is locked to `h-dvh` with
+  `overflow-hidden` on `<body>`. Below `sm`, the marketing copy compresses
+  (shorter headline, hidden trust row) so the interactive demo - the actual
+  product - always stays fully visible without scrolling. Tested down to
+  360x640.
+- **Built for non-literate users:** every district's risk is a color +
+  icon (red/amber/green, universal), and the speaker button reads the
+  warning aloud via the Web Speech API - no reading required at any step.
+- **The CTA *is* the demo:** "Hear a live warning" doesn't link anywhere -
+  it triggers the same alert-generation flow as tapping a district chip,
+  so the hero's headline promise and its proof are the same action.
+- Alert copy and risk levels for the 5 districts are illustrative (matching
+  the original app's simulated data) - wire in `services/floodAPI.js` from
+  your existing repo when you're ready to hook up the real Google Flood
+  Forecasting API.
 
-## 🎯 The Problem
-
-Traditional flood alerts fail in rural Pakistan because:
-- ❌ They use technical jargon like "450,000 cusecs" that locals don't understand
-- ❌ They're in English or formal Urdu, not local dialects (Pashto/Hindko)
-- ❌ They don't provide specific, actionable instructions
-- ❌ They don't reach people via accessible channels like WhatsApp
-
-**Result:** People don't know when to evacuate or how much time they have.
-
----
-
-## ✅ The Solution
-
-Ailaan uses AI to convert technical flood forecasting data into **dialect-specific, actionable warnings** that people actually understand and act upon.
-
-### Before Ailaan:
-> "Flood Alert: Kabul River at Nowshera is 450,000 Cusecs. High Flood. Take precautions."
-
-### After Ailaan:
-> "🚨 URGENT for Nowshera: The Kabul River water will be waist-deep by Maghrib prayers (6pm). Move your cattle and family to GT Road bypass NOW. You have only 3 hours."
-
-**In Pashto (Roman Script):**
-> "Nowshera ta khatarnak khabardari: Kabul River dera ghrandai loredzi. Da Maghrib lamanze pore ba staaso kali ta obah rashi..."
-
----
-
-## 🌟 Features
-
-### 🗣️ **Multi-Language Support**
-- **English** - For urban, educated users
-- **Pashto Script (پښتو)** - For native Pashto readers
-- **Roman Pashto** - For younger generations who read Pashto in Latin script
-- **Audio Alerts** - Voice messages for non-literate communities
-
-### 📍 **District-Specific Alerts**
-Current coverage:
-- Nowshera (Kabul River)
-- Charsadda (Kabul River)
-- Swat (Swat River)
-- Peshawar (Bara River)
-- Mardan (Kalpani River)
-
-### 📱 **WhatsApp Integration** (Coming Soon)
-- Subscribe with your phone number
-- Receive instant alerts in your preferred language
-- No app installation required - works on basic phones
-
-### 🎨 **Smart Translation**
-Instead of technical metrics, locals get:
-- ✅ Prayer time references (Maghrib, Fajr, Isha)
-- ✅ Physical landmarks (GT Road, main bazaar)
-- ✅ Relatable measurements (knee-deep, waist-deep)
-- ✅ Specific actions (move cattle, keep children safe)
-- ✅ Time remaining in simple language
-
-### 🚦 **Risk-Level System**
-- 🔴 **High Risk** - Immediate evacuation needed (3 hours)
-- 🟡 **Medium Risk** - Prepare and move livestock (6-12 hours)
-- 🟢 **Low Risk** - Normal conditions, stay alert
-
----
-
-## 🏗️ How It Works
-
-```
-┌─────────────────────┐
-│ Google Flood API    │ ← Satellite data monitoring rivers
-│ (Technical Data)    │
-└──────────┬──────────┘
-           │
-           ▼
-┌─────────────────────┐
-│ AI Translation      │ ← Gemini/GPT converts to local dialect
-│ (Gemini AI)         │
-└──────────┬──────────┘
-           │
-           ▼
-┌─────────────────────┐
-│ WhatsApp Delivery   │ ← Sent to village leaders & communities
-│ (Twilio API)        │
-└─────────────────────┘
-```
-
-### Technical Architecture:
-1. **Data Source:** Google Flood Forecasting API
-2. **AI Processing:** Large Language Model (Gemini/GPT-4) for contextual translation
-3. **Frontend:** React.js with Tailwind CSS
-4. **Distribution:** WhatsApp Business API (planned)
-5. **Hosting:** GitHub Pages
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-- Node.js (v16 or higher)
-- npm or yarn
-- Git
-
-### Installation
-
-1. **Clone the repository:**
-```bash
-git clone https://github.com/juwwad/ailaan.git
-cd ailaan
-```
-
-2. **Install dependencies:**
+## Run it
 ```bash
 npm install
+npm run dev
 ```
 
-3. **Start the development server:**
+## Build
 ```bash
-npm start
+npm run build && npm start
 ```
-
-4. **Open your browser:**
-```
-http://localhost:3000
-```
-
-### Build for Production
-
-```bash
-npm run build
-```
-
-### Deploy to GitHub Pages
-
-```bash
-npm run deploy
-```
-
----
-
-## 🛠️ Technology Stack
-
-| Technology | Purpose |
-|------------|---------|
-| **React.js** | Frontend framework |
-| **Tailwind CSS** | Styling and responsive design |
-| **Lucide React** | Icons |
-| **Google Flood API** | Real-time flood forecasting data (planned) |
-| **Gemini AI** | Technical-to-dialect translation (planned) |
-| **Twilio/WhatsApp API** | Message delivery (planned) |
-
----
-
-## 📋 Roadmap
-
-### Phase 1: ✅ MVP (Current)
-- [x] Interactive UI with district selection
-- [x] Multi-language alert display
-- [x] Risk-level visualization
-- [x] Simulated flood data
-
-### Phase 2: 🔄 In Progress
-- [ ] Google Flood Forecasting API integration
-- [ ] Backend server for AI translation
-- [ ] Real-time data processing
-- [ ] Historical data charts
-
-### Phase 3: 📅 Planned
-- [ ] WhatsApp Business API integration
-- [ ] SMS fallback for areas without internet
-- [ ] Audio message generation (text-to-speech)
-- [ ] Expansion to more districts
-- [ ] Mobile app (React Native)
-
-### Phase 4: 🎯 Future
-- [ ] Community feedback system
-- [ ] Offline mode with cached alerts
-- [ ] Integration with local disaster management authorities
-- [ ] Rainfall prediction overlay
-- [ ] Multilingual support (Hindko, Saraiki)
-
----
-
-## 🤝 Contributing
-
-We welcome contributions! Here's how you can help:
-
-1. **Fork the repository**
-2. **Create a feature branch:**
-```bash
-git checkout -b feature/your-feature-name
-```
-3. **Make your changes and commit:**
-```bash
-git commit -m "Add: your feature description"
-```
-4. **Push to your fork:**
-```bash
-git push origin feature/your-feature-name
-```
-5. **Open a Pull Request**
-
-### Areas where we need help:
-- 🌐 Pashto/Hindko translation improvements
-- 🎨 UI/UX design enhancements
-- 📊 Data visualization features
-- 🔧 Backend development (Node.js/Python)
-- 📱 WhatsApp integration
-- 📝 Documentation
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 🙏 Acknowledgments
-
-- **Google Flood Hub** - For providing free flood forecasting data
-- **Anthropic (Claude)** - AI assistance in development
-- **Local communities in KPK** - For inspiration and real-world insights
-- **Open Source Community** - For tools and libraries
-
----
-
-## 📞 Contact
-
-**Developer:** Jawad Ahmad 
-**GitHub:** [@juwwad](https://github.com/juwwad)  
-**LinkedIn** [https://linkedin.com/in/juwwad]
-**Project Link:** [https://github.com/juwwad/ailaan](https://github.com/juwwad/ailaan)
-
----
-
-## 🌍 Impact
-
-This project aims to:
-- 🛡️ **Save lives** through timely, understandable warnings
-- 🗣️ **Bridge the language gap** between technical systems and local communities
-- 📱 **Use accessible technology** (WhatsApp) that people already have
-- 🌊 **Prevent livestock and property loss** through early action
-- 👨‍👩‍👧‍👦 **Protect vulnerable populations** who are most at risk
-
----
-
-<div align="center">
-
-**Built with ❤️ for the people of Khyber Pakhtunkhwa**
-
-*Because lives matter more than technical data*
-
-[⭐ Star this repo](https://github.com/juwwad/ailaan) | [🐛 Report Bug](https://github.com/juwwad/ailaan/issues) | [💡 Request Feature](https://github.com/juwwad/ailaan/issues)
-
-</div>
