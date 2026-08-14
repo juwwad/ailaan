@@ -119,13 +119,37 @@ export default function Hero() {
   const risk = RISK_META[district.risk];
   const RiskIcon = risk.icon;
 
+  const fetchFloodStatus = async (key) => {
+    try {
+      // Use Next.js API route instead of calling backend directly
+      // This prevents CORS issues and centralizes API communication
+      const response = await fetch('/api/flood-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ district: key, coordinates: [] })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const d = DISTRICTS.find((x) => x.key === key);
+        return { status: "ready", alert: buildAlert({ ...d, ...data }) };
+      } else {
+        throw new Error('API request failed');
+      }
+    } catch (error) {
+      console.warn('Real data unavailable, using mock data:', error);
+      const d = DISTRICTS.find((x) => x.key === key);
+      return { status: "ready", alert: buildAlert(d) };
+    }
+  };
+
   const checkStatus = (key) => {
     setSelected(key);
     setDemo({ status: "loading", alert: null });
     if (timerRef.current) window.clearTimeout(timerRef.current);
-    timerRef.current = window.setTimeout(() => {
-      const d = DISTRICTS.find((x) => x.key === key);
-      setDemo({ status: "ready", alert: buildAlert(d) });
+    timerRef.current = window.setTimeout(async () => {
+      const result = await fetchFloodStatus(key);
+      setDemo(result);
     }, 550);
   };
 
@@ -182,8 +206,8 @@ export default function Hero() {
           priority
           className="object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-b md:bg-gradient-to-r from-ink via-ink/85 to-ink/40" />
-        <div className="absolute inset-0 bg-gradient-to-t from-ink via-transparent to-ink/50" />
+        <div className="absolute inset-0 bg-linear-to-b md:bg-linear-to-r from-ink via-ink/85 to-ink/40" />
+        <div className="absolute inset-0 bg-linear-to-t from-ink via-transparent to-ink/50" />
       </div>
 
       <div className="relative z-10 flex h-full flex-col">
@@ -213,7 +237,7 @@ export default function Hero() {
               href="https://github.com/juwwad/ailaan"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.06] px-3 py-2 text-xs font-semibold text-mist/90 backdrop-blur-xl transition hover:bg-white/[0.12] sm:text-sm"
+              className="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/6 px-3 py-2 text-xs font-semibold text-mist/90 backdrop-blur-xl transition hover:bg-white/12 sm:text-sm"
             >
               <GithubMark className="h-4 w-4" />
               <span className="hidden sm:inline">Source</span>
@@ -222,7 +246,7 @@ export default function Hero() {
               href="https://github.com/juwwad"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.06] px-3 py-2 text-xs font-semibold text-mist/90 backdrop-blur-xl transition hover:bg-white/[0.12] sm:text-sm"
+              className="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/6 px-3 py-2 text-xs font-semibold text-mist/90 backdrop-blur-xl transition hover:bg-white/12 sm:text-sm"
             >
               <span className="hidden text-mist/50 sm:inline">By</span>
               Jawad Ahmad
@@ -293,7 +317,7 @@ export default function Hero() {
                     className={`flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] font-semibold transition sm:text-xs ${
                       isActive
                         ? "border-signal/70 bg-signal/15 text-mist"
-                        : "border-white/10 bg-white/[0.04] text-mist/60 hover:bg-white/[0.09]"
+                        : "border-white/10 bg-white/4 text-mist/60 hover:bg-white/9"
                     }`}
                   >
                     <span
@@ -342,7 +366,7 @@ export default function Hero() {
                   className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
                     lang === l.key
                       ? "bg-white/20 text-mist"
-                      : "bg-white/[0.04] text-mist/50 hover:bg-white/[0.1]"
+                      : "bg-white/4 text-mist/50 hover:bg-white/10"
                   }`}
                 >
                   {l.label}
@@ -378,7 +402,7 @@ export default function Hero() {
                 className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition disabled:cursor-not-allowed disabled:opacity-30 sm:h-11 sm:w-11 ${
                   speaking
                     ? "risk-pulse bg-signal text-ink"
-                    : "bg-white/[0.1] text-mist hover:bg-white/[0.18]"
+                    : "bg-white/10 text-mist hover:bg-white/18"
                 }`}
                 style={{ "--ring-color": "#3fc6f0" }}
               >
@@ -406,7 +430,7 @@ export default function Hero() {
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="03XX-XXXXXXX"
-                    className="min-w-0 flex-1 rounded-full border border-white/15 bg-white/[0.05] px-3 py-1.5 text-xs text-mist placeholder:text-mist/35 outline-none focus:border-signal/60"
+                    className="min-w-0 flex-1 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-mist placeholder:text-mist/35 outline-none focus:border-signal/60"
                   />
                   <button
                     type="submit"
