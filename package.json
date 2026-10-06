@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "backend": "npm --prefix backend start",
+    "backend:test": "npm --prefix backend test"
   },
   "dependencies": {
     "geist": "^1.7.2",

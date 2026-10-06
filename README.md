@@ -32,16 +32,38 @@ glassmorphic UI and an embedded live demo of the actual product concept.
 - **The CTA *is* the demo:** "Hear a live warning" doesn't link anywhere -
   it triggers the same alert-generation flow as tapping a district chip,
   so the hero's headline promise and its proof are the same action.
-- Alert copy and risk levels for the 5 districts are illustrative (matching
-  the original app's simulated data) - wire in `services/floodAPI.js` from
-  your existing repo when you're ready to hook up the real Google Flood
-  Forecasting API.
+- Alert copy and risk levels for the 5 districts are illustrative in the UI
+  layer. Real risk levels come from the `backend/` service, which queries the
+  Google Flood Forecasting API and falls back to simulated data (flagged as
+  such) when that is unavailable.
+
+## Backend
+`backend/` is a small, dependency-free Node service that resolves flood status
+for a district. The Next.js route `app/api/flood-status` proxies to it.
+
+```bash
+cd backend
+npm start            # http://localhost:5000
+```
+
+Set `GOOGLE_FLOOD_API_KEY` (see `backend/.env.example`) to enable live data.
+Without it, responses are served as simulated and flagged `source: "simulated"`.
+See `backend/README.md` for the full API contract.
 
 ## Run it
+Start the backend, then the frontend:
+
 ```bash
+# terminal 1
+cd backend && npm start
+
+# terminal 2
 npm install
 npm run dev
 ```
+
+`NEXT_PUBLIC_BACKEND_URL` overrides the backend URL used by the proxy
+(defaults to `http://localhost:5000`).
 
 ## Build
 ```bash
