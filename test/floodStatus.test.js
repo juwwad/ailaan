@@ -71,6 +71,19 @@ test("simulatedStatus is always flagged as simulated", () => {
   assert.equal(s.discharge, 452000);
 });
 
+test("simulatedStatus maps each risk level to the matching severity", () => {
+  const expected = {
+    nowshera: "SEVERITY_ALERT",
+    charsadda: "SEVERITY_WARNING",
+    peshawar: "SEVERITY_WARNING",
+    swat: "SEVERITY_NORMAL",
+    mardan: "SEVERITY_NORMAL",
+  };
+  for (const [district, severity] of Object.entries(expected)) {
+    assert.equal(simulatedStatus(district).severity, severity, district);
+  }
+});
+
 test("getFloodStatus returns simulated data without an API key", async () => {
   const status = await getFloodStatus("nowshera", {});
   assert.equal(status.district, "nowshera");
