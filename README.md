@@ -33,37 +33,57 @@ glassmorphic UI and an embedded live demo of the actual product concept.
   it triggers the same alert-generation flow as tapping a district chip,
   so the hero's headline promise and its proof are the same action.
 - Alert copy and risk levels for the 5 districts are illustrative in the UI
-  layer. Real risk levels come from the `backend/` service, which queries the
-  Google Flood Forecasting API and falls back to simulated data (flagged as
-  such) when that is unavailable.
+  layer. Real risk levels come from the `/api/flood-status` route handler,
+  which queries the Google Flood Forecasting API and falls back to simulated
+  data (flagged as such) when that is unavailable.
 
-## Backend
-`backend/` is a small, dependency-free Node service that resolves flood status
-for a district. The Next.js route `app/api/flood-status` proxies to it.
+## Flood status API
+`app/api/flood-status/route.js` is a Next.js Route Handler — there is no
+separate backend service. It validates the district, applies rate limiting,
+caches successful live results, and returns simulated data (flagged
+`source: "simulated"`) when Google has no data.
 
-```bash
-cd backend
-npm start            # http://localhost:5000
+### `POST /api/flood-status`
+```json
+{ "district": "nowshera", "coordinates": [] }
 ```
+`district` must be one of `nowshera`, `charsadda`, `peshawar`, `swat`, `mardan`.
+`coordinates` is accepted for backwards compatibility and ignored.
 
-Set `GOOGLE_FLOOD_API_KEY` (see `backend/.env.example`) to enable live data.
-Without it, responses are served as simulated and flagged `source: "simulated"`.
-See `backend/README.md` for the full API contract.
+Response: `{ "district", "risk", "severity", "gaugeLocation", "issuedTime",
+"forecastTrend", "hasInundationMap", "source" }`. `source` is
+`google-flood-forecasting` (live) or `simulated`. The UI must label simulated
+responses rather than present them as a real warning.
+
+Errors: `400` unknown/missing district or malformed JSON, `429` rate limited.
+
+## Configuration
+Copy `.env.example` to `.env.local` for local development. All variables are
+**server-side**; never prefix them with `NEXT_PUBLIC_`.
+
+| Variable | Purpose |
+| --- | --- |
+| `GOOGLE_FLOOD_API_KEY` | Enables live data. Restrict the key to the Flood Forecasting API in Google Cloud. |
+| `FLOOD_CACHE_SECONDS` | Cache TTL for live results (default 300). Caching is what keeps Google usage low. |
+| `UPSTREAM_TIMEOUT_MS` | Google request timeout (default 10000). |
+| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | Distributed rate limiting. Without these the limiter is in-memory and per-instance. |
+| `RATE_LIMIT_MAX` | Requests per IP per minute (default 30). |
+| `GOOGLE_FLOOD_BASE_URL` | Optional upstream override for staging/tests. |
+
+## Deploying to Vercel
+1. Import the repo. Vercel detects Next.js; no build config needed.
+2. Add the environment variables above under **Settings → Environment Variables**.
+3. **Rate limiting:** serverless functions are stateless, so the in-memory
+   limiter is not effective in production. Set the Upstash variables (free tier
+   is enough) to get real distributed limits.
+4. Optionally add Vercel Firewall / WAF rate-limit rules as a second layer.
 
 ## Run it
-Start the backend, then the frontend:
-
 ```bash
-# terminal 1
-cd backend && npm start
-
-# terminal 2
 npm install
 npm run dev
 ```
 
-`NEXT_PUBLIC_BACKEND_URL` overrides the backend URL used by the proxy
-(defaults to `http://localhost:5000`).
 
 ## Build
 ```bash

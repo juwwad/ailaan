@@ -2,13 +2,13 @@
   "name": "ailaan-next",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "backend": "npm --prefix backend start",
-    "backend:test": "npm --prefix backend test"
+    "test": "node --test"
   },
   "dependencies": {
     "geist": "^1.7.2",
