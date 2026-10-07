@@ -89,3 +89,8 @@ npm run dev
 ```bash
 npm run build && npm start
 ```
+
+## License
+
+[MIT](LICENSE) © Jawad Ahmad
+
