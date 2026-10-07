@@ -3,6 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "packageManager": "npm@11.19.1",
+  "engines": {
+    "node": ">=20.9.0",
+    "npm": ">=10"
+  },
+  "allowScripts": {
+    "unrs-resolver": true
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
