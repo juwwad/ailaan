@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { createElement, useCallback, useEffect, useRef, useState } from "react";
 import {
   Volume2,
   Send,
@@ -11,55 +11,22 @@ import {
   CheckCircle2,
   MapPin,
   Languages,
+  Activity,
+  Info,
+  RefreshCw,
 } from "lucide-react";
-
-const DISTRICTS = [
-  {
-    key: "nowshera",
-    name: "Nowshera",
-    river: "Kabul River",
-    risk: "high",
-    discharge: 452000,
-    landmark: "the GT Road bypass",
-    window: "by Maghrib, around 6pm",
-  },
-  {
-    key: "charsadda",
-    name: "Charsadda",
-    river: "Kabul River",
-    risk: "medium",
-    discharge: 318000,
-    landmark: "the Peshawar road ridge",
-    window: "within 6 to 12 hours",
-  },
-  {
-    key: "peshawar",
-    name: "Peshawar",
-    river: "Bara River",
-    risk: "medium",
-    discharge: 244000,
-    landmark: "the Ring Road overpass",
-    window: "within 6 to 12 hours",
-  },
-  {
-    key: "swat",
-    name: "Swat",
-    river: "Swat River",
-    risk: "low",
-    discharge: 176000,
-    landmark: "the Mingora ridge road",
-    window: "no rise expected yet",
-  },
-  {
-    key: "mardan",
-    name: "Mardan",
-    river: "Kalpani River",
-    risk: "low",
-    discharge: 151000,
-    landmark: "the Swabi road",
-    window: "no rise expected yet",
-  },
-];
+import {
+  DEMO_DISTRICTS,
+  DISTRICT_CONTENT,
+  LANGUAGES,
+  NEUTRAL_RISK,
+  RISK_META,
+  buildAlert,
+  dataTier,
+  districtName,
+  riskFromStatus,
+  trendLabel,
+} from "@/lib/alerts";
 
 function GithubMark(props) {
   return (
@@ -69,39 +36,11 @@ function GithubMark(props) {
   );
 }
 
-const RISK_META = {
-  high: { color: "#ef4a3d", label: "High risk", icon: AlertTriangle },
-  medium: { color: "#f2a93b", label: "Medium risk", icon: Droplets },
-  low: { color: "#35d399", label: "Low risk", icon: CheckCircle2 },
+const RISK_ICONS = {
+  high: AlertTriangle,
+  medium: Droplets,
+  low: CheckCircle2,
 };
-
-const LANGUAGES = [
-  { key: "en", label: "EN" },
-  { key: "roman", label: "Roman" },
-  { key: "ps", label: "پښتو", dir: "rtl" },
-];
-
-function buildAlert(d) {
-  if (d.risk === "high") {
-    return {
-      en: `Urgent — ${d.name}: the ${d.river} is rising fast. Water will reach knee to waist depth ${d.window}. Move your family and animals to ${d.landmark} now.`,
-      roman: `${d.name} ta khatarnak khabardari: ${d.river} dera ghrandai loredzi. Obah ${d.window} kamar-jag lware wi. Khpal koranai aw tsarwi ${d.landmark} ta osa olegday.`,
-      ps: `${d.name} ته خطرناک خبرداری: ${d.river} ډېره ګړندۍ لوړېږي. اوبه به ${d.window} د زنګون تر کمر پورې لوړې وي. خپل کورنۍ او څاروي اوس مهال ${d.landmark} ته ولیږدئ.`,
-    };
-  }
-  if (d.risk === "medium") {
-    return {
-      en: `Watch — ${d.name}: the ${d.river} is rising. Low-lying streets may flood ${d.window}. Keep essentials packed and stay near ${d.landmark}.`,
-      roman: `${d.name} lapara khabardari: ${d.river} lwaregi. Teto sarakuna ${d.window} tar obo lande kedai shi. Zaroori shai chmatawali wasata.`,
-      ps: `${d.name} لپاره خبرداری: ${d.river} لوړېږي. ټیټې سړکونه ${d.window} تر اوبو لاندې کېدای شي. اړین توکي چمتو وساتئ.`,
-    };
-  }
-  return {
-    en: `Calm — ${d.name}: the ${d.river} is steady today. Risk is low, no action needed. We are still watching for you.`,
-    roman: `${d.name} nan aaram day: ${d.river} sam dy. Khatar kam dy, os hits kar pakar na dy. Mung ba mudam gorо.`,
-    ps: `${d.name} نن آرام دی: ${d.river} ثابت دی. خطر کم دی، اوس هېڅ کار پکار نه دی. موږ به مو تعقیب کوو.`,
-  };
-}
 
 export default function Hero() {
   const [selected, setSelected] = useState("nowshera");
@@ -111,50 +50,97 @@ export default function Hero() {
   const [subscribeOpen, setSubscribeOpen] = useState(false);
   const [phone, setPhone] = useState("");
   const [subscribed, setSubscribed] = useState(false);
+  // Risk key per district, learned as readings arrive, so a chip only shows a
+  // real colour once that district has actually been read.
+  const [risks, setRisks] = useState({});
 
   const autoSpeakRef = useRef(false);
   const timerRef = useRef(null);
+  const requestIdRef = useRef(0);
 
-  const district = DISTRICTS.find((d) => d.key === selected);
-  const risk = RISK_META[district.risk];
-  const RiskIcon = risk.icon;
+  const isReady = demo.status === "ready";
+  // Undefined until a reading arrives, so the card stays neutral on idle/error
+  // instead of borrowing a hardcoded risk colour.
+  const riskKey = isReady ? riskFromStatus(demo.statusBody) : null;
+  const tier = isReady ? dataTier(demo.statusBody) : null;
+  const risk = (riskKey && RISK_META[riskKey]) || NEUTRAL_RISK;
+  // Built with createElement rather than a capitalised local, so no component is
+  // defined during render (react-hooks/static-components).
+  const riskIcon = createElement(riskKey ? RISK_ICONS[riskKey] : Info, {
+    size: 20,
+    color: risk.color,
+  });
+  const riskLabel =
+    tier === "simulated" && riskKey ? `Sample: ${risk.label}` : risk.label;
+
+  const content = DISTRICT_CONTENT[selected];
+  const trend = isReady ? trendLabel(demo.statusBody?.forecastTrend) : null;
+  // Google provides no discharge figure, so live readings show the trend
+  // instead of a number. Simulated readings keep their illustrative cusecs but
+  // are flagged as sample data by the pill above.
+  const reading = !isReady
+    ? null
+    : tier === "live"
+      ? [content?.river, trend].filter(Boolean).join(" · ")
+      : [content?.river, `${demo.statusBody?.discharge?.toLocaleString()} cusecs`]
+          .filter(Boolean)
+          .join(" · ");
 
   const fetchFloodStatus = async (key) => {
-    try {
-      // Use Next.js API route instead of calling backend directly
-      // This prevents CORS issues and centralizes API communication
-      const response = await fetch('/api/flood-status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ district: key, coordinates: [] })
-      });
-      
-      const responseData = await response.json();
-      console.log('API Response:', responseData);
-      
-      if (response.ok) {
-        const d = DISTRICTS.find((x) => x.key === key);
-        return { status: "ready", alert: buildAlert({ ...d, ...responseData }) };
-      } else {
-        console.error('API Error:', responseData);
-        throw new Error(responseData.error || 'API request failed');
-      }
-    } catch (error) {
-      console.warn('Real data unavailable, using mock data:', error.message);
-      const d = DISTRICTS.find((x) => x.key === key);
-      return { status: "ready", alert: buildAlert(d) };
+    const response = await fetch("/api/flood-status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ district: key }),
+    });
+    const responseData = await response.json();
+    if (!response.ok) {
+      throw new Error(responseData?.error || "Request failed");
     }
+    const body = Object.hasOwn(responseData, "risk")
+      ? responseData
+      : responseData?.status;
+    const bodyRisk = riskFromStatus(body);
+    // A response we cannot read is treated as a failure rather than rendered
+    // as a warning, so a malformed body can never fake a flood alert.
+    if (!bodyRisk) throw new Error("Unrecognised response");
+    const sample = dataTier(body) === "simulated";
+    return {
+      status: "ready",
+      alert: buildAlert(key, bodyRisk, sample),
+      statusBody: body,
+    };
   };
 
-  const checkStatus = (key) => {
-    setSelected(key);
+  const load = useCallback(async (key) => {
+    const requestId = ++requestIdRef.current;
     setDemo({ status: "loading", alert: null });
-    if (timerRef.current) window.clearTimeout(timerRef.current);
-    timerRef.current = window.setTimeout(async () => {
+    try {
       const result = await fetchFloodStatus(key);
+      if (requestId !== requestIdRef.current) return;
       setDemo(result);
-    }, 550);
-  };
+      setRisks((prev) => ({
+        ...prev,
+        [key]: riskFromStatus(result.statusBody),
+      }));
+    } catch {
+      // Never fall back to a fabricated warning — the card stays neutral and
+      // the box explains that nothing was read.
+      if (requestId !== requestIdRef.current) return;
+      setDemo({ status: "error", alert: null });
+    }
+  }, []);
+
+  const checkStatus = useCallback(
+    (key) => {
+      const isCurrent =
+        key === selected && (demo.status === "ready" || demo.status === "loading");
+      if (isCurrent) return;
+      setSelected(key);
+      if (timerRef.current) window.clearTimeout(timerRef.current);
+      timerRef.current = window.setTimeout(() => load(key), 550);
+    },
+    [selected, demo.status, load],
+  );
 
   const speak = () => {
     if (!demo.alert || typeof window === "undefined") return;
@@ -282,7 +268,7 @@ export default function Hero() {
                 onClick={handleCtaClick}
                 className="rounded-full bg-signal px-5 py-2.5 text-sm font-bold text-ink shadow-[0_0_45px_rgba(63,198,240,0.4)] transition hover:scale-[1.03] active:scale-95 sm:px-6 sm:py-3 sm:text-base"
               >
-                Hear a live warning
+                Hear a warning
               </button>
               <span className="hidden text-xs text-mist/50 sm:inline sm:text-sm">
                 Try the demo — pick any district on the right →
@@ -311,12 +297,13 @@ export default function Hero() {
             </div>
 
             <div className="no-scrollbar flex gap-1.5 overflow-x-auto pb-0.5">
-              {DISTRICTS.map((d) => {
-                const isActive = d.key === selected;
+              {DEMO_DISTRICTS.map((key) => {
+                const isActive = key === selected;
+                const chipRisk = risks[key];
                 return (
                   <button
-                    key={d.key}
-                    onClick={() => checkStatus(d.key)}
+                    key={key}
+                    onClick={() => checkStatus(key)}
                     className={`flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] font-semibold transition sm:text-xs ${
                       isActive
                         ? "border-signal/70 bg-signal/15 text-mist"
@@ -325,9 +312,13 @@ export default function Hero() {
                   >
                     <span
                       className="h-1.5 w-1.5 rounded-full"
-                      style={{ background: RISK_META[d.risk].color }}
+                      style={{
+                        background: chipRisk
+                          ? RISK_META[chipRisk].color
+                          : NEUTRAL_RISK.color,
+                      }}
                     />
-                    {d.name}
+                    {districtName(key)}
                   </button>
                 );
               })}
@@ -335,31 +326,39 @@ export default function Hero() {
 
             <div className="flex items-center gap-3">
               <div
-                className="risk-pulse relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full sm:h-20 sm:w-20"
+                className={`relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full sm:h-20 sm:w-20 ${
+                  isReady ? "risk-pulse" : ""
+                }`}
                 style={{
                   background: `${risk.color}26`,
                   border: `2px solid ${risk.color}`,
                   "--ring-color": risk.color,
                 }}
               >
-                <RiskIcon size={20} color={risk.color} />
+                {riskIcon}
               </div>
               <div className="flex flex-col gap-0.5 sm:gap-1">
                 <span className="text-sm font-bold text-mist sm:text-lg">
-                  {district.name}
+                  {districtName(selected)}
                 </span>
                 <span className="font-mono text-[10px] text-mist/50 sm:text-[11px]">
-                  {district.river} · {district.discharge.toLocaleString()}{" "}
-                  cusecs
+                  {reading || `${content?.river} · not read yet`}
                 </span>
                 <span
                   className="w-fit rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
                   style={{ background: `${risk.color}22`, color: risk.color }}
                 >
-                  {risk.label}
+                  {riskLabel}
                 </span>
               </div>
             </div>
+
+            {tier === "simulated" && (
+              <p className="flex items-start gap-1.5 rounded-lg border border-risk-medium/40 bg-risk-medium/10 px-2.5 py-1.5 text-[11px] font-semibold text-risk-medium">
+                <Info size={13} className="mt-px shrink-0" />
+                Sample data — not a live warning.
+              </p>
+            )}
 
             <div className="flex gap-1.5">
               {LANGUAGES.map((l) => (
@@ -390,6 +389,20 @@ export default function Hero() {
                   the warning out loud.
                 </span>
               )}
+              {demo.status === "error" && (
+                <span className="flex flex-col items-start gap-1.5">
+                  <span className="text-mist/60">
+                    Couldn&rsquo;t reach the warning service. Nothing has been
+                    read for this district.
+                  </span>
+                  <button
+                    onClick={() => load(selected)}
+                    className="flex items-center gap-1 font-semibold text-signal-soft hover:text-mist"
+                  >
+                    <RefreshCw size={12} /> Retry
+                  </button>
+                </span>
+              )}
               {demo.status === "ready" && (
                 <span className="animate-rise line-clamp-3">
                   {demo.alert[lang]}
@@ -400,7 +413,7 @@ export default function Hero() {
             <div className="flex items-center gap-3">
               <button
                 onClick={speak}
-                disabled={!demo.alert}
+                disabled={!isReady}
                 aria-label="Speak the warning aloud"
                 className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition disabled:cursor-not-allowed disabled:opacity-30 sm:h-11 sm:w-11 ${
                   speaking
