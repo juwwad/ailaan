@@ -6,6 +6,7 @@ import {
   buildAlert,
   dataTier,
   districtName,
+  readingLine,
   riskFromStatus,
   trendLabel,
 } from "../lib/alerts.js";
@@ -77,6 +78,34 @@ test("sample alerts are prefixed with the spoken caveat in every language", () =
     assert.ok(sample[lang].length > live[lang].length);
   }
   assert.match(buildAlert("nowshera", "high", true).en, /not a live warning/i);
+});
+
+test("readingLine shows the trend for live data, never a discharge number", () => {
+  const content = { river: "Kabul River" };
+  assert.equal(
+    readingLine(content, { forecastTrend: "RISING", discharge: 452000 }, "live"),
+    "Kabul River · Rising",
+  );
+  // A live body that happens to carry a discharge figure must still not show it.
+  assert.doesNotMatch(
+    readingLine(content, { forecastTrend: "RISING", discharge: 452000 }, "live"),
+    /cusecs/,
+  );
+});
+
+test("readingLine shows illustrative cusecs for simulated data", () => {
+  const content = { river: "Kalpani River" };
+  assert.equal(
+    readingLine(content, { discharge: 151000 }, "simulated"),
+    "Kalpani River · 151,000 cusecs",
+  );
+});
+
+test("readingLine degrades to just the river when detail is missing", () => {
+  assert.equal(readingLine({ river: "Swat River" }, {}, "simulated"), "Swat River");
+  assert.equal(readingLine({ river: "Swat River" }, { discharge: 0 }, "simulated"),
+    "Swat River · 0 cusecs");
+  assert.equal(readingLine(undefined, {}, "live"), "");
 });
 
 test("each risk level maps to a distinct, presentable colour", () => {

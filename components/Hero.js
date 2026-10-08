@@ -11,7 +11,6 @@ import {
   CheckCircle2,
   MapPin,
   Languages,
-  Activity,
   Info,
   RefreshCw,
 } from "lucide-react";
@@ -25,7 +24,7 @@ import {
   dataTier,
   districtName,
   riskFromStatus,
-  trendLabel,
+  readingLine,
 } from "@/lib/alerts";
 
 function GithubMark(props) {
@@ -57,6 +56,9 @@ export default function Hero() {
   const autoSpeakRef = useRef(false);
   const timerRef = useRef(null);
   const requestIdRef = useRef(0);
+  // Mirrors `selected` for asynchronous callbacks that must not read stale
+  // closure state.
+  const selectedRef = useRef("nowshera");
 
   const isReady = demo.status === "ready";
   // Undefined until a reading arrives, so the card stays neutral on idle/error
@@ -74,17 +76,9 @@ export default function Hero() {
     tier === "simulated" && riskKey ? `Sample: ${risk.label}` : risk.label;
 
   const content = DISTRICT_CONTENT[selected];
-  const trend = isReady ? trendLabel(demo.statusBody?.forecastTrend) : null;
-  // Google provides no discharge figure, so live readings show the trend
-  // instead of a number. Simulated readings keep their illustrative cusecs but
-  // are flagged as sample data by the pill above.
-  const reading = !isReady
-    ? null
-    : tier === "live"
-      ? [content?.river, trend].filter(Boolean).join(" · ")
-      : [content?.river, `${demo.statusBody?.discharge?.toLocaleString()} cusecs`]
-          .filter(Boolean)
-          .join(" · ");
+  const reading = isReady
+    ? readingLine(content, demo.statusBody, tier)
+    : null;
 
   const fetchFloodStatus = async (key) => {
     const response = await fetch("/api/flood-status", {
@@ -114,9 +108,14 @@ export default function Hero() {
   const load = useCallback(async (key) => {
     const requestId = ++requestIdRef.current;
     setDemo({ status: "loading", alert: null });
+    // Apply a response only if it is still the newest request *and* that
+    // request is for the district currently on screen — otherwise a slow reply
+    // for an earlier district could render its numbers under the new name.
+    const isCurrent = () =>
+      requestId === requestIdRef.current && key === selectedRef.current;
     try {
       const result = await fetchFloodStatus(key);
-      if (requestId !== requestIdRef.current) return;
+      if (!isCurrent()) return;
       setDemo(result);
       setRisks((prev) => ({
         ...prev,
@@ -125,7 +124,7 @@ export default function Hero() {
     } catch {
       // Never fall back to a fabricated warning — the card stays neutral and
       // the box explains that nothing was read.
-      if (requestId !== requestIdRef.current) return;
+      if (!isCurrent()) return;
       setDemo({ status: "error", alert: null });
     }
   }, []);
@@ -135,6 +134,7 @@ export default function Hero() {
       const isCurrent =
         key === selected && (demo.status === "ready" || demo.status === "loading");
       if (isCurrent) return;
+      selectedRef.current = key;
       setSelected(key);
       if (timerRef.current) window.clearTimeout(timerRef.current);
       timerRef.current = window.setTimeout(() => load(key), 550);
