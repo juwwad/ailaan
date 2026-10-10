@@ -58,8 +58,9 @@ responses rather than present them as a real warning.
 Errors: `400` unknown/missing district or malformed JSON, `429` rate limited.
 
 ## Configuration
-Copy `.env.example` to `.env.local` for local development. All variables are
-**server-side**; never prefix them with `NEXT_PUBLIC_`.
+Copy `.env.example` to `.env.local` for local development. Except for
+`NEXT_PUBLIC_SITE_URL`, all variables are **server-side**; never prefix the
+others with `NEXT_PUBLIC_`.
 
 | Variable | Purpose |
 | --- | --- |
@@ -69,6 +70,7 @@ Copy `.env.example` to `.env.local` for local development. All variables are
 | `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | Distributed rate limiting. Without these the limiter is in-memory and per-instance. |
 | `RATE_LIMIT_MAX` | Requests per IP per minute (default 30). |
 | `GOOGLE_FLOOD_BASE_URL` | Optional upstream override for staging/tests. |
+| `NEXT_PUBLIC_SITE_URL` | Optional. Canonical origin for `metadataBase`, `robots.txt` and `sitemap.xml` (e.g. `https://ailaan.pk`). Falls back to `VERCEL_PROJECT_PRODUCTION_URL` on Vercel. |
 
 ## Deploying to Vercel
 1. Import the repo. Vercel detects Next.js; no build config needed.
