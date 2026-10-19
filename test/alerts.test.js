@@ -57,10 +57,21 @@ test("buildAlert picks the wording for the supplied risk level", () => {
 });
 
 test("buildAlert never derives a risk level on its own", () => {
-  // The previous implementation read `risk` off a hardcoded array. With no risk
-  // supplied the wording must be the calm one, not a fabricated warning.
-  assert.match(buildAlert("nowshera", null).en, /^Calm/);
-  assert.match(buildAlert("nowshera", "unknown").en, /^Calm/);
+  // An unknown/absent risk must produce the explicit unknown wording, never the
+  // reassuring "calm" copy (issue #31).
+  assert.match(buildAlert("nowshera", null).en, /^Risk unknown/);
+  assert.match(buildAlert("nowshera", "unknown").en, /^Risk unknown/);
+  assert.doesNotMatch(buildAlert("nowshera", null).en, /^Calm/);
+});
+
+test("the unknown-risk message is not reassurance and is present in every language", () => {
+  const alert = buildAlert("nowshera", null);
+  for (const lang of ["en", "roman", "ps"]) {
+    assert.equal(typeof alert[lang], "string");
+    assert.ok(alert[lang].length > 0);
+  }
+  assert.doesNotMatch(alert.en, /no action needed/i);
+  assert.match(alert.en, /not.*all-clear/i);
 });
 
 test("buildAlert returns null for a district it has no copy for", () => {

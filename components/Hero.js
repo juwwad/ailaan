@@ -20,6 +20,7 @@ import {
   LANGUAGES,
   NEUTRAL_RISK,
   RISK_META,
+  UNKNOWN_RISK,
   buildAlert,
   dataTier,
   districtName,
@@ -67,7 +68,9 @@ export default function Hero() {
   // instead of borrowing a hardcoded risk colour.
   const riskKey = isReady ? riskFromStatus(demo.statusBody) : null;
   const tier = isReady ? dataTier(demo.statusBody) : null;
-  const risk = (riskKey && RISK_META[riskKey]) || NEUTRAL_RISK;
+  // A ready reading with no recognised risk is "unknown", not "not checked yet".
+  const risk =
+    (riskKey && RISK_META[riskKey]) || (isReady ? UNKNOWN_RISK : NEUTRAL_RISK);
   // Built with createElement rather than a capitalised local, so no component is
   // defined during render (react-hooks/static-components).
   const riskIcon = createElement(riskKey ? RISK_ICONS[riskKey] : Info, {
