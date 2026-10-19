@@ -13,12 +13,14 @@ import {
   DISTRICT_KEYS,
 } from "../lib/districts.js";
 
-test("severityToRisk maps every Google severity", () => {
+test("severityToRisk maps known severities and refuses to guess", () => {
   assert.equal(severityToRisk("SEVERITY_ALERT"), "high");
   assert.equal(severityToRisk("SEVERITY_WARNING"), "medium");
   assert.equal(severityToRisk("SEVERITY_NORMAL"), "low");
-  assert.equal(severityToRisk("SEVERITY_UNKNOWN"), "low");
-  assert.equal(severityToRisk(undefined), "low");
+  // Unknown or unrecognised must never read as a safe "low" (issue #31).
+  assert.equal(severityToRisk("SEVERITY_UNKNOWN"), null);
+  assert.equal(severityToRisk("SOMETHING_ELSE"), null);
+  assert.equal(severityToRisk(undefined), null);
 });
 
 test("normalizeFloodStatuses maps the first Google status", () => {
@@ -42,6 +44,13 @@ test("normalizeFloodStatuses returns null for empty/missing statuses", () => {
   assert.equal(normalizeFloodStatuses([]), null);
   assert.equal(normalizeFloodStatuses(undefined), null);
   assert.equal(normalizeFloodStatuses(null), null);
+});
+
+test("normalizeFloodStatuses carries an unknown severity through as risk null", () => {
+  const out = normalizeFloodStatuses([{ severity: "SEVERITY_UNKNOWN" }]);
+  assert.equal(out.risk, null);
+  assert.equal(out.severity, "SEVERITY_UNKNOWN");
+  assert.equal(out.source, "google-flood-forecasting");
 });
 
 test("isValidDistrict accepts known keys and rejects others", () => {
