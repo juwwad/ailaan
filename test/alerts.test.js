@@ -4,6 +4,7 @@ import {
   DEMO_DISTRICTS,
   RISK_META,
   buildAlert,
+  ctaAction,
   dataTier,
   districtName,
   readingLine,
@@ -131,6 +132,18 @@ test("readingLine degrades to just the river when detail is missing", () => {
   assert.equal(readingLine({ river: "Swat River" }, { discharge: 0 }, "simulated"),
     "Swat River · 0 cusecs");
   assert.equal(readingLine(undefined, {}, "live"), "");
+});
+
+test("ctaAction replays when a reading is already shown, otherwise loads", () => {
+  // A reading on screen: the CTA must re-speak, not silently no-op.
+  assert.equal(ctaAction({ status: "ready", hasAlert: true }), "replay");
+  // Nothing on screen yet, or still loading/error: arm the load path.
+  assert.equal(ctaAction({ status: "idle", hasAlert: false }), "load");
+  assert.equal(ctaAction({ status: "loading", hasAlert: false }), "load");
+  assert.equal(ctaAction({ status: "error", hasAlert: false }), "load");
+  // Ready but no alert object: nothing to speak, so fall back to loading.
+  assert.equal(ctaAction({ status: "ready", hasAlert: false }), "load");
+  assert.equal(ctaAction(), "load");
 });
 
 test("each risk level maps to a distinct, presentable colour", () => {
