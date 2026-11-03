@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  bucketCount,
   checkRateLimit,
   clientKeyFromHeaders,
   RATE_LIMIT,
@@ -39,6 +40,20 @@ test("fails open when the distributed store is unreachable", async () => {
   } finally {
     globalThis.fetch = original;
   }
+});
+
+test("stale buckets are evicted so the in-memory map cannot grow without bound", async () => {
+  // Far-future timestamps so every bucket left by other tests is already stale.
+  const t0 = 2_000_000_000_000_000;
+  // A fresh key in a fresh window triggers a sweep, then is itself stored.
+  await checkRateLimit(`evict-a-${Math.random()}`, { now: t0 });
+  assert.equal(bucketCount(), 1, "the sweep cleared every earlier window");
+
+  // One window later: the sweep runs and the previous window's bucket is gone.
+  await checkRateLimit(`evict-b-${Math.random()}`, {
+    now: t0 + RATE_LIMIT.windowSeconds * 1000,
+  });
+  assert.equal(bucketCount(), 1, "only the new window's bucket should remain");
 });
 
 test("clientKeyFromHeaders extracts the first forwarded IP", () => {
