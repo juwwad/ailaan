@@ -1,9 +1,17 @@
 import { unstable_cache } from "next/cache";
 import { fetchLiveFloodStatus, simulatedStatus } from "@/lib/floodStatus";
 import { handleFloodStatusRequest } from "@/lib/floodStatusHandler";
+import { positiveIntEnv } from "@/lib/env";
 
-const CACHE_SECONDS = Number(process.env.FLOOD_CACHE_SECONDS || 300);
-const UPSTREAM_TIMEOUT_MS = Number(process.env.UPSTREAM_TIMEOUT_MS || 10000);
+// Both values feed the live fetch directly: a non-numeric timeout makes
+// AbortSignal.timeout throw (live data silently degrades to simulated), so
+// invalid input falls back to the documented default rather than poisoning it.
+const CACHE_SECONDS = positiveIntEnv(process.env.FLOOD_CACHE_SECONDS, 300, "FLOOD_CACHE_SECONDS");
+const UPSTREAM_TIMEOUT_MS = positiveIntEnv(
+  process.env.UPSTREAM_TIMEOUT_MS,
+  10000,
+  "UPSTREAM_TIMEOUT_MS",
+);
 
 // Only successful live results are cached. If Google has no data we throw so the
 // (simulated) fallback is generated per request and recovery is immediate
