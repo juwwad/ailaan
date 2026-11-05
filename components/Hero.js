@@ -20,6 +20,7 @@ import {
   LANGUAGES,
   NEUTRAL_RISK,
   RISK_META,
+  SUBSCRIBE_COPY,
   UNKNOWN_RISK,
   buildAlert,
   ctaAction,
@@ -52,7 +53,9 @@ export default function Hero() {
   const [speaking, setSpeaking] = useState(false);
   const [subscribeOpen, setSubscribeOpen] = useState(false);
   const [phone, setPhone] = useState("");
+  const [phoneError, setPhoneError] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
+  const subscribeCopy = SUBSCRIBE_COPY[lang] || SUBSCRIBE_COPY.en;
   // Risk key per district, learned as readings arrive, so a chip only shows a
   // real colour once that district has actually been read.
   const [risks, setRisks] = useState({});
@@ -209,7 +212,12 @@ export default function Hero() {
   // send anything anywhere yet. A real WhatsApp sign-up needs a backend (#8).
   const handleSubscribe = (e) => {
     e.preventDefault();
-    if (phone.replace(/\D/g, "").length < 10) return;
+    if (phone.replace(/\D/g, "").length < 10) {
+      // Surface the rejection instead of silently ignoring the submit.
+      setPhoneError(true);
+      return;
+    }
+    setPhoneError(false);
     setSubscribed(true);
   };
 
@@ -484,18 +492,36 @@ export default function Hero() {
                     type="tel"
                     inputMode="tel"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      if (phoneError) setPhoneError(false);
+                    }}
                     placeholder="03XX-XXXXXXX"
-                    className="min-w-0 flex-1 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-mist placeholder:text-mist/35 outline-none focus:border-signal/60"
+                    aria-label={subscribeCopy.input}
+                    aria-invalid={phoneError}
+                    aria-describedby={phoneError ? "subscribe-error" : undefined}
+                    className={`min-w-0 flex-1 rounded-full border bg-white/5 px-3 py-1.5 text-xs text-mist placeholder:text-mist/35 outline-none focus:border-signal/60 ${
+                      phoneError ? "border-risk-high/70" : "border-white/15"
+                    }`}
                   />
                   <button
                     type="submit"
-                    aria-label="Subscribe"
+                    aria-label={subscribeCopy.submit}
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-signal text-ink transition hover:scale-105"
                   >
                     <Send size={14} />
                   </button>
                 </form>
+              )}
+              {phoneError && (
+                <p
+                  id="subscribe-error"
+                  role="alert"
+                  className="flex items-start gap-1.5 text-xs font-semibold text-risk-high"
+                >
+                  <AlertTriangle size={14} className="mt-px shrink-0" />
+                  <span>{subscribeCopy.invalid}</span>
+                </p>
               )}
               {subscribed && (
                 <p
