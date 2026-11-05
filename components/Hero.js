@@ -22,6 +22,7 @@ import {
   RISK_META,
   UNKNOWN_RISK,
   buildAlert,
+  ctaAction,
   dataTier,
   districtName,
   pickVoice,
@@ -192,6 +193,14 @@ export default function Hero() {
   };
 
   const handleCtaClick = () => {
+    // The headline CTA is the audio path for non-literate users, so it must
+    // always (re)play. When a reading is already on screen for the selected
+    // district, checkStatus() is a no-op and the speak-on-ready effect never
+    // fires again — replay it directly instead of silently doing nothing.
+    if (ctaAction({ status: demo.status, hasAlert: Boolean(demo.alert) }) === "replay") {
+      speak();
+      return;
+    }
     autoSpeakRef.current = true;
     checkStatus(selected);
   };
