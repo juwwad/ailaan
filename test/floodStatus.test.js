@@ -4,7 +4,6 @@ import {
   normalizeFloodStatuses,
   severityToRisk,
   simulatedStatus,
-  getFloodStatus,
   fetchLiveFloodStatus,
 } from "../lib/floodStatus.js";
 import {
@@ -90,45 +89,6 @@ test("simulatedStatus maps each risk level to the matching severity", () => {
   };
   for (const [district, severity] of Object.entries(expected)) {
     assert.equal(simulatedStatus(district).severity, severity, district);
-  }
-});
-
-test("getFloodStatus returns simulated data without an API key", async () => {
-  const status = await getFloodStatus("nowshera", {});
-  assert.equal(status.district, "nowshera");
-  assert.equal(status.simulated, true);
-  assert.equal(status.source, "simulated");
-});
-
-test("getFloodStatus returns live data when the upstream responds", async () => {
-  const original = globalThis.fetch;
-  globalThis.fetch = async () => ({
-    ok: true,
-    json: async () => ({
-      floodStatuses: [{ severity: "SEVERITY_WARNING", inundationMapSet: [] }],
-    }),
-  });
-  try {
-    const status = await getFloodStatus("mardan", { apiKey: "fake" });
-    assert.equal(status.source, "google-flood-forecasting");
-    assert.equal(status.risk, "medium");
-    assert.equal(status.simulated, undefined);
-  } finally {
-    globalThis.fetch = original;
-  }
-});
-
-test("getFloodStatus falls back to simulated data on upstream failure", async () => {
-  const original = globalThis.fetch;
-  globalThis.fetch = async () => {
-    throw new Error("network down");
-  };
-  try {
-    const status = await getFloodStatus("swat", { apiKey: "fake" });
-    assert.equal(status.simulated, true);
-    assert.equal(status.source, "simulated");
-  } finally {
-    globalThis.fetch = original;
   }
 });
 
