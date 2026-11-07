@@ -2,7 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   DEMO_DISTRICTS,
+  LANGUAGES,
   RISK_META,
+  SUBSCRIBE_COPY,
   buildAlert,
   ctaAction,
   dataTier,
@@ -153,4 +155,19 @@ test("each risk level maps to a distinct, presentable colour", () => {
     assert.match(meta.color, /^#[0-9a-f]{6}$/i);
     assert.ok(meta.label.length > 0);
   }
+});
+
+test("subscribe copy exists for every UI language and never reuses the English string", () => {
+  for (const { key } of LANGUAGES) {
+    const copy = SUBSCRIBE_COPY[key];
+    assert.ok(copy, `missing SUBSCRIBE_COPY.${key}`);
+    for (const field of ["input", "invalid", "submit"]) {
+      assert.equal(typeof copy[field], "string");
+      assert.ok(copy[field].trim().length > 0, `empty ${key}.${field}`);
+    }
+  }
+  // The phone input's accessible name must be translated, not left as English,
+  // otherwise a Pashto screen-reader user hears an unrelated label.
+  assert.notEqual(SUBSCRIBE_COPY.ps.input, SUBSCRIBE_COPY.en.input);
+  assert.notEqual(SUBSCRIBE_COPY.ps.invalid, SUBSCRIBE_COPY.en.invalid);
 });
