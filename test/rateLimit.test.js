@@ -56,9 +56,43 @@ test("stale buckets are evicted so the in-memory map cannot grow without bound",
   assert.equal(bucketCount(), 1, "only the new window's bucket should remain");
 });
 
-test("clientKeyFromHeaders extracts the first forwarded IP", () => {
+test("clientKeyFromHeaders uses the trusted right-most hop, not the client-supplied left-most", () => {
+  // "client, proxy" — the left entry is whatever the caller sent, so the key
+  // must come from the right-most (proxy-appended) entry.
   const headers = new Headers({ "x-forwarded-for": "203.0.113.7, 10.0.0.1" });
-  assert.equal(clientKeyFromHeaders(headers), "203.0.113.7");
+  assert.equal(clientKeyFromHeaders(headers), "10.0.0.1");
+});
+
+test("a spoofed x-forwarded-for cannot mint a fresh rate-limit bucket", () => {
+  // Same real client, different forged left-most entry each request: the derived
+  // key must be identical, otherwise the limiter is trivially bypassed (#33).
+  const key = () =>
+    clientKeyFromHeaders(
+      new Headers({
+        "x-forwarded-for": `${Math.random()}-spoofed, 198.51.100.9`,
+      }),
+    );
+  assert.equal(key(), "198.51.100.9");
+  assert.equal(key(), "198.51.100.9");
+});
+
+test("clientKeyFromHeaders prefers the platform-set x-real-ip over forwarded", () => {
+  const headers = new Headers({
+    "x-forwarded-for": "1.2.3.4, 5.6.7.8",
+    "x-real-ip": "198.51.100.9",
+  });
+  assert.equal(clientKeyFromHeaders(headers), "198.51.100.9");
+});
+
+test("clientKeyFromHeaders handles a single forwarded value and blank entries", () => {
+  assert.equal(
+    clientKeyFromHeaders(new Headers({ "x-forwarded-for": "203.0.113.7" })),
+    "203.0.113.7",
+  );
+  assert.equal(
+    clientKeyFromHeaders(new Headers({ "x-forwarded-for": " 203.0.113.7 , " })),
+    "203.0.113.7",
+  );
 });
 
 test("clientKeyFromHeaders falls back to x-real-ip then unknown", () => {
