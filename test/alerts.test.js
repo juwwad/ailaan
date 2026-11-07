@@ -9,6 +9,7 @@ import {
   ctaAction,
   dataTier,
   districtName,
+  parseStatusResponse,
   readingLine,
   riskFromStatus,
   trendLabel,
@@ -146,6 +147,40 @@ test("ctaAction replays when a reading is already shown, otherwise loads", () =>
   // Ready but no alert object: nothing to speak, so fall back to loading.
   assert.equal(ctaAction({ status: "ready", hasAlert: false }), "load");
   assert.equal(ctaAction(), "load");
+});
+
+test("parseStatusResponse keeps a live unknown severity readable (#53)", () => {
+  // A successful live fetch whose severity is unrecognised must not be turned
+  // into a connectivity failure: the honest unknown-risk copy must render.
+  const live = {
+    district: "nowshera",
+    risk: null,
+    severity: "SEVERITY_UNKNOWN",
+    source: "google-flood-forecasting",
+  };
+  const parsed = parseStatusResponse("nowshera", live);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.status, "ready");
+  assert.equal(parsed.statusBody, live);
+  assert.equal(riskFromStatus(parsed.statusBody), null);
+  assert.equal(dataTier(parsed.statusBody), "live");
+  assert.match(parsed.alert.en, /^Risk unknown/);
+  assert.doesNotMatch(parsed.alert.en, /^Calm/);
+});
+
+test("parseStatusResponse fails safe on an unreadable body", () => {
+  // A body we cannot read must not be rendered as a warning.
+  assert.deepEqual(parseStatusResponse("nowshera", "nope"), { ok: false });
+  assert.deepEqual(parseStatusResponse("nowshera", 42), { ok: false });
+  assert.deepEqual(parseStatusResponse("nowshera", { status: null }), { ok: false });
+});
+
+test("parseStatusResponse accepts the legacy { status } wrapper", () => {
+  const wrapped = { status: { district: "swat", risk: "low", source: "simulated" } };
+  const parsed = parseStatusResponse("swat", wrapped);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.statusBody, wrapped.status);
+  assert.match(parsed.alert.en, /not a live warning/i);
 });
 
 test("each risk level maps to a distinct, presentable colour", () => {

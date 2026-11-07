@@ -22,10 +22,10 @@ import {
   RISK_META,
   SUBSCRIBE_COPY,
   UNKNOWN_RISK,
-  buildAlert,
   ctaAction,
   dataTier,
   districtName,
+  parseStatusResponse,
   pickVoice,
   readingLine,
   riskFromStatus,
@@ -99,19 +99,11 @@ export default function Hero() {
     if (!response.ok) {
       throw new Error(responseData?.error || "Request failed");
     }
-    const body = Object.hasOwn(responseData, "risk")
-      ? responseData
-      : responseData?.status;
-    const bodyRisk = riskFromStatus(body);
-    // A response we cannot read is treated as a failure rather than rendered
-    // as a warning, so a malformed body can never fake a flood alert.
-    if (!bodyRisk) throw new Error("Unrecognised response");
-    const sample = dataTier(body) === "simulated";
-    return {
-      status: "ready",
-      alert: buildAlert(key, bodyRisk, sample),
-      statusBody: body,
-    };
+    // Distinguishes "unreadable body" (fail safe) from "readable body with an
+    // unrecognised risk" (render the honest unknown-risk state) — see #53.
+    const parsed = parseStatusResponse(key, responseData);
+    if (!parsed.ok) throw new Error("Unrecognised response");
+    return parsed;
   };
 
   const load = useCallback(async (key) => {
