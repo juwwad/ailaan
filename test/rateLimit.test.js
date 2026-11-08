@@ -1,5 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import {
   bucketCount,
   checkRateLimit,
@@ -101,4 +103,60 @@ test("clientKeyFromHeaders falls back to x-real-ip then unknown", () => {
     "198.51.100.9",
   );
   assert.equal(clientKeyFromHeaders(new Headers()), "unknown");
+});
+
+// rateLimit.js reads TRUSTED_PROXY_HOPS at import time, so exercise the parsed
+// value in a fresh process with a deliberately invalid / oversized setting.
+function runInFreshProcess(env, script) {
+  const root = fileURLToPath(new URL("..", import.meta.url));
+  const out = execFileSync(process.execPath, ["--input-type=module", "-e", script], {
+    cwd: root,
+    env: { ...process.env, ...env },
+    encoding: "utf8",
+  });
+  return JSON.parse(out.trim().split("\n").pop());
+}
+
+test("a non-numeric TRUSTED_PROXY_HOPS degrades to the default instead of collapsing every client into one bucket", () => {
+  // Two different clients must not share a key when the value is garbage (#62).
+  const parsed = runInFreshProcess(
+    { TRUSTED_PROXY_HOPS: "abc" },
+    `import { clientKeyFromHeaders } from "./lib/rateLimit.js";
+     const key = (ip) =>
+       clientKeyFromHeaders(new Headers({ "x-forwarded-for": ip }));
+     console.log(JSON.stringify({ a: key("1.1.1.1"), b: key("9.9.9.9") }));`,
+  );
+  assert.notEqual(parsed.a, undefined);
+  assert.notEqual(parsed.a, parsed.b, "distinct clients must not share a bucket");
+});
+
+test("a chain shorter than TRUSTED_PROXY_HOPS is not keyed on the spoofable left-most entry", () => {
+  // A hop count larger than the chain would, under the old Math.max(0, ...) index,
+  // select the client-supplied left-most entry and re-open spoofing (#33, #62).
+  // Such a request did not arrive through the expected proxies, so key it
+  // "unknown" instead of trusting any value in the header.
+  const parsed = runInFreshProcess(
+    { TRUSTED_PROXY_HOPS: "3" },
+    `import { clientKeyFromHeaders } from "./lib/rateLimit.js";
+     console.log(JSON.stringify({
+       tooShort: clientKeyFromHeaders(new Headers({ "x-forwarded-for": "1.1.1.1, 10.0.0.1" })),
+       exact: clientKeyFromHeaders(new Headers({ "x-forwarded-for": "1.1.1.1, 10.0.0.1, 10.0.0.2" })),
+     }));`,
+  );
+  assert.equal(parsed.tooShort, "unknown");
+  // With three trusted hops the client is the third entry from the end.
+  assert.equal(parsed.exact, "1.1.1.1");
+});
+
+test("the default single trusted hop still keys on the right-most forwarded entry", () => {
+  // Guards against the fix changing the documented default behaviour: with one
+  // trusted proxy the right-most entry is the client.
+  const parsed = runInFreshProcess(
+    {},
+    `import { clientKeyFromHeaders } from "./lib/rateLimit.js";
+     console.log(JSON.stringify({
+       key: clientKeyFromHeaders(new Headers({ "x-forwarded-for": "1.1.1.1, 10.0.0.1" })),
+     }));`,
+  );
+  assert.equal(parsed.key, "10.0.0.1");
 });
