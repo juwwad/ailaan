@@ -25,6 +25,7 @@ import {
   ctaAction,
   dataTier,
   districtName,
+  documentLanguage,
   parseStatusResponse,
   pickVoice,
   readingLine,
@@ -177,6 +178,14 @@ export default function Hero() {
       }
     };
   }, []);
+
+  // Reflect the selected language on the document element so assistive tech and
+  // the browser's text handling are told the right language/direction (#39).
+  useEffect(() => {
+    const { lang: htmlLang, dir } = documentLanguage(lang);
+    document.documentElement.lang = htmlLang;
+    document.documentElement.dir = dir;
+  }, [lang]);
 
   const selectLang = (key) => {
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
