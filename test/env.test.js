@@ -1,8 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
 import { positiveIntEnv } from "../lib/env.js";
+import { runInFreshProcess } from "../test-helpers/runInFreshProcess.js";
 
 test("positiveIntEnv parses a valid positive integer", () => {
   assert.equal(positiveIntEnv("45", 30, "X"), 45);
@@ -24,18 +23,6 @@ test("positiveIntEnv refuses non-numeric and non-positive values", () => {
   assert.equal(positiveIntEnv("-5", 30, "X"), 30);
   assert.equal(positiveIntEnv("3.5", 30, "X"), 30);
 });
-
-// rateLimit.js reads the environment at import time, so exercise it in a fresh
-// process with a deliberately invalid value.
-function runInFreshProcess(env, script) {
-  const root = fileURLToPath(new URL("..", import.meta.url));
-  const out = execFileSync(process.execPath, ["--input-type=module", "-e", script], {
-    cwd: root,
-    env: { ...process.env, ...env },
-    encoding: "utf8",
-  });
-  return JSON.parse(out.trim().split("\n").pop());
-}
 
 test("a non-numeric RATE_LIMIT_MAX degrades to the default instead of denying all traffic", () => {
   const parsed = runInFreshProcess(

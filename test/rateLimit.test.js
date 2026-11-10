@@ -1,13 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
 import {
   bucketCount,
   checkRateLimit,
   clientKeyFromHeaders,
   RATE_LIMIT,
 } from "../lib/rateLimit.js";
+import { runInFreshProcess } from "../test-helpers/runInFreshProcess.js";
 
 test("allows requests up to the limit, then denies", async () => {
   const key = `test-allow-${Math.random()}`;
@@ -104,18 +103,6 @@ test("clientKeyFromHeaders falls back to x-real-ip then unknown", () => {
   );
   assert.equal(clientKeyFromHeaders(new Headers()), "unknown");
 });
-
-// rateLimit.js reads TRUSTED_PROXY_HOPS at import time, so exercise the parsed
-// value in a fresh process with a deliberately invalid / oversized setting.
-function runInFreshProcess(env, script) {
-  const root = fileURLToPath(new URL("..", import.meta.url));
-  const out = execFileSync(process.execPath, ["--input-type=module", "-e", script], {
-    cwd: root,
-    env: { ...process.env, ...env },
-    encoding: "utf8",
-  });
-  return JSON.parse(out.trim().split("\n").pop());
-}
 
 test("a non-numeric TRUSTED_PROXY_HOPS degrades to the default instead of collapsing every client into one bucket", () => {
   // Two different clients must not share a key when the value is garbage (#62).
