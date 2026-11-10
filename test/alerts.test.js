@@ -5,6 +5,8 @@ import {
   LANGUAGES,
   RISK_META,
   SUBSCRIBE_COPY,
+  UNAVAILABLE_NOTICE,
+  alertSpeech,
   buildAlert,
   ctaAction,
   dataTier,
@@ -205,4 +207,43 @@ test("subscribe copy exists for every UI language and never reuses the English s
   // otherwise a Pashto screen-reader user hears an unrelated label.
   assert.notEqual(SUBSCRIBE_COPY.ps.input, SUBSCRIBE_COPY.en.input);
   assert.notEqual(SUBSCRIBE_COPY.ps.invalid, SUBSCRIBE_COPY.en.invalid);
+});
+
+test("alertSpeech reads the alert in the selected language when a reading is ready", () => {
+  const alert = buildAlert("nowshera", "high");
+  assert.equal(alertSpeech("ready", alert, "en"), alert.en);
+  assert.equal(alertSpeech("ready", alert, "ps"), alert.ps);
+});
+
+test("alertSpeech speaks an honest warning in the unreachable state (#67)", () => {
+  // Silence here is indistinguishable from "no warning" for a non-literate user,
+  // so the error state must speak — and must not read as an all-clear.
+  for (const lang of ["en", "roman", "ps"]) {
+    const text = alertSpeech("error", null, lang);
+    assert.equal(text, UNAVAILABLE_NOTICE[lang]);
+    assert.ok(text.trim().length > 0);
+  }
+  assert.match(alertSpeech("error", null, "en"), /not an all-clear/i);
+  assert.doesNotMatch(alertSpeech("error", null, "en"), /no action needed/i);
+});
+
+test("alertSpeech has nothing to say while idle or loading", () => {
+  assert.equal(alertSpeech("idle", null, "en"), null);
+  assert.equal(alertSpeech("loading", null, "en"), null);
+  // Ready but with no alert object: nothing to speak.
+  assert.equal(alertSpeech("ready", null, "en"), null);
+});
+
+test("alertSpeech falls back to English for an unknown language", () => {
+  assert.equal(alertSpeech("error", null, "fr"), UNAVAILABLE_NOTICE.en);
+  const alert = { en: "hi" };
+  assert.equal(alertSpeech("ready", alert, "fr"), "hi");
+});
+
+test("the unavailable notice is present in every UI language", () => {
+  for (const { key } of LANGUAGES) {
+    const text = UNAVAILABLE_NOTICE[key];
+    assert.equal(typeof text, "string");
+    assert.ok(text.trim().length > 0, `empty UNAVAILABLE_NOTICE.${key}`);
+  }
 });

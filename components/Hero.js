@@ -22,6 +22,7 @@ import {
   RISK_META,
   SUBSCRIBE_COPY,
   UNKNOWN_RISK,
+  alertSpeech,
   ctaAction,
   dataTier,
   districtName,
@@ -68,6 +69,9 @@ export default function Hero() {
   const selectedRef = useRef("nowshera");
 
   const isReady = demo.status === "ready";
+  // Whether pressing play produces audio. The error state now speaks the
+  // "unreachable" warning, so it must not leave the audio control disabled.
+  const speakable = alertSpeech(demo.status, demo.alert, lang) !== null;
   // Undefined until a reading arrives, so the card stays neutral on idle/error
   // instead of borrowing a hardcoded risk colour.
   const riskKey = isReady ? riskFromStatus(demo.statusBody) : null;
@@ -144,12 +148,13 @@ export default function Hero() {
   );
 
   const speak = () => {
-    if (!demo.alert || typeof window === "undefined") return;
+    const text = alertSpeech(demo.status, demo.alert, lang);
+    if (!text || typeof window === "undefined") return;
     if (!("speechSynthesis" in window)) return;
     // Cancel any in-flight utterance so a second press does not queue audio
     // behind the first.
     window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(demo.alert[lang]);
+    const utter = new SpeechSynthesisUtterance(text);
     const target = speechLang(lang);
     const voice = pickVoice(window.speechSynthesis.getVoices?.(), target);
     if (voice) utter.voice = voice;
@@ -162,7 +167,10 @@ export default function Hero() {
   };
 
   useEffect(() => {
-    if (demo.status === "ready" && autoSpeakRef.current) {
+    // Speak on arrival of a reading, and also when a CTA-triggered load fails:
+    // the CTA is the audio path for non-literate users, so it must not end in
+    // silence (#67).
+    if ((demo.status === "ready" || demo.status === "error") && autoSpeakRef.current) {
       autoSpeakRef.current = false;
       speak();
     }
@@ -425,9 +433,12 @@ export default function Hero() {
               )}
               {demo.status === "error" && (
                 <span className="flex flex-col items-start gap-1.5">
-                  <span className="text-mist/60">
-                    Couldn&rsquo;t reach the warning service. Nothing has been
-                    read for this district.
+                  <span className="flex items-start gap-1.5 text-mist/70">
+                    <AlertTriangle size={14} className="mt-px shrink-0 text-risk-medium" />
+                    <span>
+                      Couldn&rsquo;t reach the warning service. Nothing has been
+                      read for this district — this is not an all-clear.
+                    </span>
                   </span>
                   <button
                     onClick={() => load(selected)}
@@ -447,7 +458,7 @@ export default function Hero() {
             <div className="flex items-center gap-3">
               <button
                 onClick={speak}
-                disabled={!isReady}
+                disabled={!speakable}
                 aria-label="Speak the warning aloud"
                 className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition disabled:cursor-not-allowed disabled:opacity-30 sm:h-11 sm:w-11 ${
                   speaking
