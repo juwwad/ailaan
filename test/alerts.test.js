@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   DEMO_DISTRICTS,
+  DISTRICT_CONTENT,
   LANGUAGES,
   RISK_META,
   SUBSCRIBE_COPY,
@@ -58,6 +59,39 @@ test("buildAlert picks the wording for the supplied risk level", () => {
 
   const low = buildAlert("swat", "low");
   assert.match(low.en, /^Calm/);
+});
+
+test("active-risk copy never contradicts itself with a no-rise window (#77)", () => {
+  // Swat and Mardan once carried the calm-case phrase "no rise expected yet",
+  // which the high/medium templates splice after "…will reach knee to waist
+  // depth" / "…may flood" — a warning that contradicted itself mid-sentence.
+  for (const district of DEMO_DISTRICTS) {
+    const window = DISTRICT_CONTENT[district].window;
+    assert.doesNotMatch(
+      window,
+      /no rise expected/i,
+      `${district} window must not be a no-rise phrase`,
+    );
+    assert.match(
+      window,
+      /\d/,
+      `${district} window should name a time frame`,
+    );
+    for (const risk of ["high", "medium"]) {
+      const alert = buildAlert(district, risk);
+      for (const lang of ["en", "roman", "ps"]) {
+        assert.doesNotMatch(
+          alert[lang],
+          /no rise expected/i,
+          `${district} ${risk} ${lang} must not say "no rise expected"`,
+        );
+        assert.ok(
+          alert[lang].includes(window),
+          `${district} ${risk} ${lang} should state the district window`,
+        );
+      }
+    }
+  }
 });
 
 test("buildAlert never derives a risk level on its own", () => {
