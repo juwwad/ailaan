@@ -9,6 +9,7 @@ import {
   ctaAction,
   dataTier,
   districtName,
+  documentLanguage,
   parseStatusResponse,
   readingLine,
   riskFromStatus,
@@ -205,4 +206,23 @@ test("subscribe copy exists for every UI language and never reuses the English s
   // otherwise a Pashto screen-reader user hears an unrelated label.
   assert.notEqual(SUBSCRIBE_COPY.ps.input, SUBSCRIBE_COPY.en.input);
   assert.notEqual(SUBSCRIBE_COPY.ps.invalid, SUBSCRIBE_COPY.en.invalid);
+});
+
+test("every UI language declares a BCP-47 lang tag", () => {
+  for (const { key } of LANGUAGES) {
+    const { lang } = documentLanguage(key);
+    assert.match(lang, /^[a-z]{2}(-[A-Za-z]+)?$/, `bad lang for ${key}`);
+  }
+});
+
+test("documentLanguage reflects the selected language, not always English (#39)", () => {
+  assert.deepEqual(documentLanguage("en"), { lang: "en", dir: "ltr" });
+  assert.deepEqual(documentLanguage("ps"), { lang: "ps", dir: "rtl" });
+  // Roman Pashto is Latin script and reads left-to-right.
+  assert.deepEqual(documentLanguage("roman"), { lang: "ps-Latn", dir: "ltr" });
+});
+
+test("documentLanguage falls back to English for an unknown language", () => {
+  assert.deepEqual(documentLanguage("fr"), { lang: "en", dir: "ltr" });
+  assert.deepEqual(documentLanguage(undefined), { lang: "en", dir: "ltr" });
 });
