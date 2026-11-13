@@ -72,7 +72,8 @@ others with `NEXT_PUBLIC_`.
 | `UPSTREAM_TIMEOUT_MS` | Google request timeout (default 10000). |
 | `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | Distributed rate limiting. Without these the limiter is in-memory and per-instance. |
 | `RATE_LIMIT_MAX` | Requests per IP per minute (default 30). |
-| `TRUSTED_PROXY_HOPS` | Number of trusted proxies appending to `x-forwarded-for` (default 1). The rate-limit key is taken this many entries from the right; the client-supplied left-most entry is never trusted. Ignored on Vercel, which sets `x-real-ip`. |
+| `TRUSTED_PROXY_HOPS` | Number of trusted proxies appending to `x-forwarded-for` (default 1). The rate-limit key is taken this many entries from the right; the client-supplied left-most entry is never trusted. Only used off Vercel. |
+| `VERCEL` | Set by Vercel itself (do not set it manually). When present, the limiter trusts `x-real-ip`, which Vercel sets to the true client and overwrites on every request. On any other host `x-real-ip` is attacker-controlled and is ignored. |
 | `GOOGLE_FLOOD_BASE_URL` | Optional upstream override for staging/tests. |
 | `NEXT_PUBLIC_SITE_URL` | Optional. Canonical origin for `metadataBase`, `robots.txt` and `sitemap.xml` (e.g. `https://ailaan.pk`). Falls back to `VERCEL_PROJECT_PRODUCTION_URL` on Vercel. |
 
