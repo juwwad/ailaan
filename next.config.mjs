@@ -38,6 +38,9 @@ if (isProd) {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Do not advertise the framework on every response; the header adds nothing
+  // for users and only narrows the search space for an attacker.
+  poweredByHeader: false,
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
