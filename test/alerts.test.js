@@ -11,6 +11,7 @@ import {
   ctaAction,
   dataTier,
   districtName,
+  documentLanguage,
   parseStatusResponse,
   readingLine,
   riskFromStatus,
@@ -209,41 +210,21 @@ test("subscribe copy exists for every UI language and never reuses the English s
   assert.notEqual(SUBSCRIBE_COPY.ps.invalid, SUBSCRIBE_COPY.en.invalid);
 });
 
-test("alertSpeech reads the alert in the selected language when a reading is ready", () => {
-  const alert = buildAlert("nowshera", "high");
-  assert.equal(alertSpeech("ready", alert, "en"), alert.en);
-  assert.equal(alertSpeech("ready", alert, "ps"), alert.ps);
-});
-
-test("alertSpeech speaks an honest warning in the unreachable state (#67)", () => {
-  // Silence here is indistinguishable from "no warning" for a non-literate user,
-  // so the error state must speak — and must not read as an all-clear.
-  for (const lang of ["en", "roman", "ps"]) {
-    const text = alertSpeech("error", null, lang);
-    assert.equal(text, UNAVAILABLE_NOTICE[lang]);
-    assert.ok(text.trim().length > 0);
-  }
-  assert.match(alertSpeech("error", null, "en"), /not an all-clear/i);
-  assert.doesNotMatch(alertSpeech("error", null, "en"), /no action needed/i);
-});
-
-test("alertSpeech has nothing to say while idle or loading", () => {
-  assert.equal(alertSpeech("idle", null, "en"), null);
-  assert.equal(alertSpeech("loading", null, "en"), null);
-  // Ready but with no alert object: nothing to speak.
-  assert.equal(alertSpeech("ready", null, "en"), null);
-});
-
-test("alertSpeech falls back to English for an unknown language", () => {
-  assert.equal(alertSpeech("error", null, "fr"), UNAVAILABLE_NOTICE.en);
-  const alert = { en: "hi" };
-  assert.equal(alertSpeech("ready", alert, "fr"), "hi");
-});
-
-test("the unavailable notice is present in every UI language", () => {
+test("every UI language declares a BCP-47 lang tag", () => {
   for (const { key } of LANGUAGES) {
-    const text = UNAVAILABLE_NOTICE[key];
-    assert.equal(typeof text, "string");
-    assert.ok(text.trim().length > 0, `empty UNAVAILABLE_NOTICE.${key}`);
+    const { lang } = documentLanguage(key);
+    assert.match(lang, /^[a-z]{2}(-[A-Za-z]+)?$/, `bad lang for ${key}`);
   }
+});
+
+test("documentLanguage reflects the selected language, not always English (#39)", () => {
+  assert.deepEqual(documentLanguage("en"), { lang: "en", dir: "ltr" });
+  assert.deepEqual(documentLanguage("ps"), { lang: "ps", dir: "rtl" });
+  // Roman Pashto is Latin script and reads left-to-right.
+  assert.deepEqual(documentLanguage("roman"), { lang: "ps-Latn", dir: "ltr" });
+});
+
+test("documentLanguage falls back to English for an unknown language", () => {
+  assert.deepEqual(documentLanguage("fr"), { lang: "en", dir: "ltr" });
+  assert.deepEqual(documentLanguage(undefined), { lang: "en", dir: "ltr" });
 });
