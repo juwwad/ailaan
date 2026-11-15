@@ -4,7 +4,9 @@ import {
   DEMO_DISTRICTS,
   LANGUAGES,
   RISK_META,
+  SIMULATED_NOTICE,
   SUBSCRIBE_COPY,
+  UNKNOWN_NOTICE,
   buildAlert,
   ctaAction,
   dataTier,
@@ -84,8 +86,10 @@ test("buildAlert returns null for a district it has no copy for", () => {
 });
 
 test("all Roman-Pashto alert text uses ASCII characters only", () => {
+  // Include the unknown-risk branch (riskKey null): it renders UNKNOWN_NOTICE,
+  // which is reachable on a live reading with an unrecognised severity (#84).
   for (const district of DEMO_DISTRICTS) {
-    for (const risk of ["high", "medium", "low"]) {
+    for (const risk of ["high", "medium", "low", null]) {
       for (const sample of [false, true]) {
         assert.match(
           buildAlert(district, risk, sample).roman,
@@ -95,6 +99,21 @@ test("all Roman-Pashto alert text uses ASCII characters only", () => {
       }
     }
   }
+});
+
+test("Roman-Pashto UI copy outside buildAlert is ASCII-only", () => {
+  for (const [key, copy] of Object.entries(SUBSCRIBE_COPY)) {
+    if (key === "ps") continue; // Pashto is Perso-Arabic script, not Roman.
+    for (const [field, value] of Object.entries(copy)) {
+      assert.match(
+        value,
+        /^[\x00-\x7F]*$/,
+        `SUBSCRIBE_COPY.${key}.${field} should be ASCII`,
+      );
+    }
+  }
+  assert.match(UNKNOWN_NOTICE.roman, /^[\x00-\x7F]*$/, "UNKNOWN_NOTICE.roman should be ASCII");
+  assert.match(SIMULATED_NOTICE.roman, /^[\x00-\x7F]*$/, "SIMULATED_NOTICE.roman should be ASCII");
 });
 
 test("sample alerts are prefixed with the spoken caveat in every language", () => {
