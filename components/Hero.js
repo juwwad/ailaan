@@ -23,6 +23,7 @@ import {
   SUBSCRIBE_COPY,
   UNKNOWN_RISK,
   alertSpeech,
+  controlLabel,
   ctaAction,
   dataTier,
   districtName,
@@ -351,7 +352,7 @@ export default function Hero() {
                     key={key}
                     onClick={() => checkStatus(key)}
                     aria-pressed={isActive}
-                    aria-label={`Read the warning for ${districtName(key)}`}
+                    aria-label={controlLabel(lang, "district", districtName(key))}
                     className={`flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[11px] font-semibold transition sm:text-xs ${
                       isActive
                         ? "border-signal/70 bg-signal/15 text-mist"
@@ -468,7 +469,7 @@ export default function Hero() {
               <button
                 onClick={speak}
                 disabled={!speakable}
-                aria-label="Speak the warning aloud"
+                aria-label={controlLabel(lang, "speak")}
                 className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition disabled:cursor-not-allowed disabled:opacity-30 sm:h-11 sm:w-11 ${
                   speaking
                     ? "risk-pulse bg-signal text-ink"
