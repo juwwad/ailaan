@@ -133,6 +133,17 @@ test("all Roman-Pashto alert text uses ASCII characters only", () => {
   }
 });
 
+test("the unreachable-service Roman-Pashto notice is ASCII-only", () => {
+  // The ASCII invariant covers all Roman-Pashto copy, not just buildAlert output.
+  // UNAVAILABLE_NOTICE shipped a non-ASCII em dash because the per-string checks
+  // never enumerated it (#93). (UNKNOWN_NOTICE/SUBSCRIBE_COPY are handled by #84.)
+  assert.match(
+    UNAVAILABLE_NOTICE.roman,
+    /^[\x00-\x7F]*$/,
+    "UNAVAILABLE_NOTICE.roman should be ASCII",
+  );
+});
+
 test("sample alerts are prefixed with the spoken caveat in every language", () => {
   for (const lang of ["en", "roman", "ps"]) {
     const sample = buildAlert("nowshera", "high", true);
