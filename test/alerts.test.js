@@ -45,6 +45,32 @@ test("dataTier treats anything not explicitly live as simulated", () => {
   assert.equal(dataTier(null), "simulated");
 });
 
+test("the simulated flag outranks a live source (#95)", () => {
+  // The contract carries both labels, so a body that says `simulated: true` must
+  // never be spoken as a live warning just because `source` claims otherwise.
+  const contradictory = {
+    source: "google-flood-forecasting",
+    simulated: true,
+  };
+  assert.equal(dataTier(contradictory), "simulated");
+
+  // ...and the sample caveat must reach the alert text for that body.
+  const parsed = parseStatusResponse("nowshera", {
+    district: "nowshera",
+    risk: "high",
+    source: "google-flood-forecasting",
+    simulated: true,
+  });
+  assert.match(parsed.alert.en, /Sample demo/);
+  assert.match(parsed.alert.roman, /Sample demo/);
+
+  // `simulated: false` on a live source stays live.
+  assert.equal(
+    dataTier({ source: "google-flood-forecasting", simulated: false }),
+    "live",
+  );
+});
+
 test("trendLabel names known trends and passes through unknown ones", () => {
   assert.equal(trendLabel("RISING"), "Rising");
   assert.equal(trendLabel("FALLING"), "Falling");
