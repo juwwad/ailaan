@@ -20,7 +20,8 @@ users (color + icon + audio), real flood warnings, honest about data quality.
   `lucide-react`. No backend service — API lives in Route Handlers.
 - **Package manager: npm** (decided with Jawad); `packageManager: npm@11.19.1`.
 - Root `package.json` has `"type": "module"` so ESM sources load under
-  `node --test`. Tests: `npm test` (`node --test`), 57 passing in `test/`.
+  `node --test`. Run `npm test` for the current test count — do not trust a
+  number written here, it drifts.
 - Commands: `npm run dev` / `build` / `start` / `lint` / `test`.
 
 ## Architecture
@@ -36,7 +37,7 @@ users (color + icon + audio), real flood warnings, honest about data quality.
   fallback; fails open. `clientKeyFromHeaders` prefers the platform-set
   `x-real-ip`, else counts `TRUSTED_PROXY_HOPS` entries back from the right of
   `x-forwarded-for` (never the client-supplied left-most entry).
-- `components/Hero.js` (~537 lines) — all client UI: district chips, language
+- `components/Hero.js` — all client UI: district chips, language
   toggle, TTS `speak()`, `handleSubscribe`; alert wording lives in
   `lib/alerts.js` (`buildAlert()`).
 
@@ -71,8 +72,9 @@ The original ordered plan (#2, #3, #15, #17, #5, #6, #10, #11, #8, #14, #18) is
 **complete** — all of those issues are closed and merged (PRs #16–#29). Keep
 Hero.js edits serialized: it is one large client component.
 
-Open backlog at time of writing: #8, #32, #37, #39, #40, #41, #58, #59, #62,
-#65, #67, #70, #73, #74. Check the issue list for the current state rather than
-trusting this line.
+Do not keep a backlog list here — it goes stale within days. Query the API for
+the current one: `GET /repos/juwwad/ailaan/issues?state=open`, and check open
+PRs before picking work, since most open issues already have a PR in flight.
+#47 is the rolling Daily SDLC log issue, not work to implement.
 
 <!-- END:ailaan-project-memory -->
