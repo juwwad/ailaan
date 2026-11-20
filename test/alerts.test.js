@@ -7,9 +7,12 @@ import {
   MAX_READING_AGE_MS,
   NEUTRAL_RISK,
   RISK_META,
+  SIMULATED_NOTICE,
+  STALE_NOTICE,
   STALE_RISK,
   SUBSCRIBE_COPY,
   UNAVAILABLE_NOTICE,
+  UNKNOWN_NOTICE,
   UNKNOWN_RISK,
   alertSpeech,
   buildAlert,
@@ -127,8 +130,10 @@ test("buildAlert returns null for a district it has no copy for", () => {
 });
 
 test("all Roman-Pashto alert text uses ASCII characters only", () => {
+  // Include the unknown-risk branch (riskKey null): it renders UNKNOWN_NOTICE,
+  // which is reachable on a live reading with an unrecognised severity (#84).
   for (const district of DEMO_DISTRICTS) {
-    for (const risk of ["high", "medium", "low"]) {
+    for (const risk of ["high", "medium", "low", null]) {
       for (const sample of [false, true]) {
         assert.match(
           buildAlert(district, risk, sample).roman,
@@ -137,6 +142,30 @@ test("all Roman-Pashto alert text uses ASCII characters only", () => {
         );
       }
     }
+  }
+});
+
+test("Roman-Pashto UI copy outside buildAlert is ASCII-only", () => {
+  for (const [key, copy] of Object.entries(SUBSCRIBE_COPY)) {
+    if (key === "ps") continue; // Pashto is Perso-Arabic script, not Roman.
+    for (const [field, value] of Object.entries(copy)) {
+      assert.match(
+        value,
+        /^[\x00-\x7F]*$/,
+        `SUBSCRIBE_COPY.${key}.${field} should be ASCII`,
+      );
+    }
+  }
+  // Every spoken/visible Roman-Pashto string, not just the ones that existed
+  // when this test was written: a new notice must not reintroduce a non-ASCII
+  // dash (the bug #84 fixes).
+  for (const [name, notice] of Object.entries({
+    UNKNOWN_NOTICE,
+    SIMULATED_NOTICE,
+    STALE_NOTICE,
+    UNAVAILABLE_NOTICE,
+  })) {
+    assert.match(notice.roman, /^[\x00-\x7F]*$/, `${name}.roman should be ASCII`);
   }
 });
 
