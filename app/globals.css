@@ -35,6 +35,13 @@ body {
   color: var(--mist);
 }
 
+/* The browser default ring is rgb(16, 16, 16) — about 1:1 against this
+   dark page, so keyboard focus was invisible. --signal is 9.76:1 on --ink. */
+:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+}
+
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
