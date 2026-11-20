@@ -21,16 +21,16 @@ import {
   NEUTRAL_RISK,
   RISK_META,
   SUBSCRIBE_COPY,
-  UNKNOWN_RISK,
   alertSpeech,
   ctaAction,
-  dataTier,
   districtName,
   documentLanguage,
   parseStatusResponse,
   pickVoice,
+  presentationTier,
   readingLine,
   riskFromStatus,
+  riskPresentation,
   speechLang,
 } from "@/lib/alerts";
 
@@ -76,18 +76,18 @@ export default function Hero() {
   // Undefined until a reading arrives, so the card stays neutral on idle/error
   // instead of borrowing a hardcoded risk colour.
   const riskKey = isReady ? riskFromStatus(demo.statusBody) : null;
-  const tier = isReady ? dataTier(demo.statusBody) : null;
+  // "live" only when the reading is genuinely current; a stale live reading is
+  // its own tier so it can never render as a fresh warning (#74).
+  const tier = isReady ? presentationTier(demo.statusBody) : null;
   // A ready reading with no recognised risk is "unknown", not "not checked yet".
-  const risk =
-    (riskKey && RISK_META[riskKey]) || (isReady ? UNKNOWN_RISK : NEUTRAL_RISK);
+  // A stale reading is neutral and labelled "out of date" — never a risk colour.
+  const { risk, iconKey } = riskPresentation(tier, riskKey);
   // Built with createElement rather than a capitalised local, so no component is
   // defined during render (react-hooks/static-components).
-  const riskIcon = createElement(riskKey ? RISK_ICONS[riskKey] : Info, {
+  const riskIcon = createElement(iconKey ? RISK_ICONS[iconKey] : Info, {
     size: 20,
     color: risk.color,
   });
-  const riskLabel =
-    tier === "simulated" && riskKey ? `Sample: ${risk.label}` : risk.label;
 
   const content = DISTRICT_CONTENT[selected];
   const reading = isReady
@@ -125,7 +125,9 @@ export default function Hero() {
       setDemo(result);
       setRisks((prev) => ({
         ...prev,
-        [key]: riskFromStatus(result.statusBody),
+        // A stale reading must not paint the chip with a live risk colour.
+        [key]:
+          result.tier === "stale" ? null : riskFromStatus(result.statusBody),
       }));
     } catch {
       // Never fall back to a fabricated warning — the card stays neutral and
@@ -375,7 +377,7 @@ export default function Hero() {
             <div className="flex items-center gap-3">
               <div
                 className={`relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full sm:h-20 sm:w-20 ${
-                  isReady ? "risk-pulse" : ""
+                  isReady && tier !== "stale" ? "risk-pulse" : ""
                 }`}
                 style={{
                   background: `${risk.color}26`,
@@ -396,7 +398,7 @@ export default function Hero() {
                   className="w-fit rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
                   style={{ background: `${risk.color}22`, color: risk.color }}
                 >
-                  {riskLabel}
+                  {risk.label}
                 </span>
               </div>
             </div>
@@ -405,6 +407,13 @@ export default function Hero() {
               <p className="flex items-start gap-1.5 rounded-lg border border-risk-medium/40 bg-risk-medium/10 px-2.5 py-1.5 text-[11px] font-semibold text-risk-medium">
                 <Info size={13} className="mt-px shrink-0" />
                 Sample data — not a live warning.
+              </p>
+            )}
+
+            {tier === "stale" && (
+              <p className="flex items-start gap-1.5 rounded-lg border border-white/20 bg-white/5 px-2.5 py-1.5 text-[11px] font-semibold text-mist/70">
+                <Info size={13} className="mt-px shrink-0" />
+                This reading is out of date — not a current warning.
               </p>
             )}
 
