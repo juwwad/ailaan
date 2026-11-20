@@ -2,17 +2,21 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   DEMO_DISTRICTS,
+  DISTRICT_CONTENT,
   LANGUAGES,
   MAX_READING_AGE_MS,
   NEUTRAL_RISK,
   RISK_META,
   STALE_RISK,
   SUBSCRIBE_COPY,
+  UNAVAILABLE_NOTICE,
   UNKNOWN_RISK,
+  alertSpeech,
   buildAlert,
   ctaAction,
   dataTier,
   districtName,
+  documentLanguage,
   isStale,
   parseStatusResponse,
   presentationTier,
@@ -65,6 +69,39 @@ test("buildAlert picks the wording for the supplied risk level", () => {
 
   const low = buildAlert("swat", "low");
   assert.match(low.en, /^Calm/);
+});
+
+test("active-risk copy never contradicts itself with a no-rise window (#77)", () => {
+  // Swat and Mardan once carried the calm-case phrase "no rise expected yet",
+  // which the high/medium templates splice after "…will reach knee to waist
+  // depth" / "…may flood" — a warning that contradicted itself mid-sentence.
+  for (const district of DEMO_DISTRICTS) {
+    const window = DISTRICT_CONTENT[district].window;
+    assert.doesNotMatch(
+      window,
+      /no rise expected/i,
+      `${district} window must not be a no-rise phrase`,
+    );
+    assert.match(
+      window,
+      /\d/,
+      `${district} window should name a time frame`,
+    );
+    for (const risk of ["high", "medium"]) {
+      const alert = buildAlert(district, risk);
+      for (const lang of ["en", "roman", "ps"]) {
+        assert.doesNotMatch(
+          alert[lang],
+          /no rise expected/i,
+          `${district} ${risk} ${lang} must not say "no rise expected"`,
+        );
+        assert.ok(
+          alert[lang].includes(window),
+          `${district} ${risk} ${lang} should state the district window`,
+        );
+      }
+    }
+  }
 });
 
 test("buildAlert never derives a risk level on its own", () => {
@@ -292,4 +329,23 @@ test("subscribe copy exists for every UI language and never reuses the English s
   // otherwise a Pashto screen-reader user hears an unrelated label.
   assert.notEqual(SUBSCRIBE_COPY.ps.input, SUBSCRIBE_COPY.en.input);
   assert.notEqual(SUBSCRIBE_COPY.ps.invalid, SUBSCRIBE_COPY.en.invalid);
+});
+
+test("every UI language declares a BCP-47 lang tag", () => {
+  for (const { key } of LANGUAGES) {
+    const { lang } = documentLanguage(key);
+    assert.match(lang, /^[a-z]{2}(-[A-Za-z]+)?$/, `bad lang for ${key}`);
+  }
+});
+
+test("documentLanguage reflects the selected language, not always English (#39)", () => {
+  assert.deepEqual(documentLanguage("en"), { lang: "en", dir: "ltr" });
+  assert.deepEqual(documentLanguage("ps"), { lang: "ps", dir: "rtl" });
+  // Roman Pashto is Latin script and reads left-to-right.
+  assert.deepEqual(documentLanguage("roman"), { lang: "ps-Latn", dir: "ltr" });
+});
+
+test("documentLanguage falls back to English for an unknown language", () => {
+  assert.deepEqual(documentLanguage("fr"), { lang: "en", dir: "ltr" });
+  assert.deepEqual(documentLanguage(undefined), { lang: "en", dir: "ltr" });
 });

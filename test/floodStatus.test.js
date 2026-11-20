@@ -52,6 +52,45 @@ test("normalizeFloodStatuses carries an unknown severity through as risk null", 
   assert.equal(out.source, "google-flood-forecasting");
 });
 
+test("normalizeFloodStatuses reports the most severe status, not the first", () => {
+  // A district's bounding box can cover several gauges; a clear reading must not
+  // mask a worse one later in the array.
+  const out = normalizeFloodStatuses([
+    { severity: "SEVERITY_NORMAL", gaugeLocation: "clear gauge" },
+    { severity: "SEVERITY_ALERT", gaugeLocation: "alert gauge" },
+  ]);
+  assert.equal(out.risk, "high");
+  assert.equal(out.severity, "SEVERITY_ALERT");
+  assert.equal(out.gaugeLocation, "alert gauge");
+});
+
+test("normalizeFloodStatuses keeps a low risk when every gauge is normal", () => {
+  const out = normalizeFloodStatuses([
+    { severity: "SEVERITY_NORMAL" },
+    { severity: "SEVERITY_NORMAL" },
+  ]);
+  assert.equal(out.risk, "low");
+  assert.equal(out.severity, "SEVERITY_NORMAL");
+});
+
+test("normalizeFloodStatuses never lets a normal gauge mask an unknown one", () => {
+  const out = normalizeFloodStatuses([
+    { severity: "SEVERITY_NORMAL" },
+    { severity: "SEVERITY_UNKNOWN" },
+  ]);
+  assert.equal(out.risk, null);
+  assert.equal(out.severity, "SEVERITY_UNKNOWN");
+});
+
+test("normalizeFloodStatuses ranks an unrecognised severity above normal", () => {
+  const out = normalizeFloodStatuses([
+    { severity: "SOMETHING_ELSE" },
+    { severity: "SEVERITY_NORMAL" },
+  ]);
+  assert.equal(out.risk, null);
+  assert.equal(out.severity, "SOMETHING_ELSE");
+});
+
 test("isValidDistrict accepts known keys and rejects others", () => {
   for (const key of DISTRICT_KEYS) assert.equal(isValidDistrict(key), true);
   assert.equal(isValidDistrict("karachi"), false);

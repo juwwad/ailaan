@@ -6,6 +6,7 @@ import {
   clientKeyFromHeaders,
   RATE_LIMIT,
 } from "../lib/rateLimit.js";
+import { runInFreshProcess } from "../test-helpers/runInFreshProcess.js";
 
 test("allows requests up to the limit, then denies", async () => {
   const key = `test-allow-${Math.random()}`;
@@ -77,11 +78,35 @@ test("a spoofed x-forwarded-for cannot mint a fresh rate-limit bucket", () => {
 });
 
 test("clientKeyFromHeaders prefers the platform-set x-real-ip over forwarded", () => {
-  const headers = new Headers({
-    "x-forwarded-for": "1.2.3.4, 5.6.7.8",
-    "x-real-ip": "198.51.100.9",
-  });
-  assert.equal(clientKeyFromHeaders(headers), "198.51.100.9");
+  // x-real-ip is only trusted where the platform sets it (Vercel).
+  process.env.VERCEL = "1";
+  try {
+    const headers = new Headers({
+      "x-forwarded-for": "1.2.3.4, 5.6.7.8",
+      "x-real-ip": "198.51.100.9",
+    });
+    assert.equal(clientKeyFromHeaders(headers), "198.51.100.9");
+  } finally {
+    delete process.env.VERCEL;
+  }
+});
+
+test("a client-supplied x-real-ip is not trusted off Vercel (#65)", () => {
+  // Same bypass as #33, different header: on a host that does not set x-real-ip,
+  // a forged value must not mint a fresh rate-limit bucket.
+  delete process.env.VERCEL;
+  const key = () =>
+    clientKeyFromHeaders(
+      new Headers({
+        "x-real-ip": `${Math.random()}-spoofed`,
+        "x-forwarded-for": "203.0.113.7, 10.0.0.1",
+      }),
+    );
+  assert.equal(key(), "10.0.0.1");
+  assert.equal(key(), "10.0.0.1");
+
+  // With no forwarded chain either, it falls through to "unknown", not the header.
+  assert.equal(clientKeyFromHeaders(new Headers({ "x-real-ip": "9.9.9.9" })), "unknown");
 });
 
 test("clientKeyFromHeaders handles a single forwarded value and blank entries", () => {
@@ -96,9 +121,58 @@ test("clientKeyFromHeaders handles a single forwarded value and blank entries", 
 });
 
 test("clientKeyFromHeaders falls back to x-real-ip then unknown", () => {
-  assert.equal(
-    clientKeyFromHeaders(new Headers({ "x-real-ip": "198.51.100.9" })),
-    "198.51.100.9",
-  );
+  process.env.VERCEL = "1";
+  try {
+    assert.equal(
+      clientKeyFromHeaders(new Headers({ "x-real-ip": "198.51.100.9" })),
+      "198.51.100.9",
+    );
+  } finally {
+    delete process.env.VERCEL;
+  }
   assert.equal(clientKeyFromHeaders(new Headers()), "unknown");
+});
+
+test("a non-numeric TRUSTED_PROXY_HOPS degrades to the default instead of collapsing every client into one bucket", () => {
+  // Two different clients must not share a key when the value is garbage (#62).
+  const parsed = runInFreshProcess(
+    { TRUSTED_PROXY_HOPS: "abc" },
+    `import { clientKeyFromHeaders } from "./lib/rateLimit.js";
+     const key = (ip) =>
+       clientKeyFromHeaders(new Headers({ "x-forwarded-for": ip }));
+     console.log(JSON.stringify({ a: key("1.1.1.1"), b: key("9.9.9.9") }));`,
+  );
+  assert.notEqual(parsed.a, undefined);
+  assert.notEqual(parsed.a, parsed.b, "distinct clients must not share a bucket");
+});
+
+test("a chain shorter than TRUSTED_PROXY_HOPS is not keyed on the spoofable left-most entry", () => {
+  // A hop count larger than the chain would, under the old Math.max(0, ...) index,
+  // select the client-supplied left-most entry and re-open spoofing (#33, #62).
+  // Such a request did not arrive through the expected proxies, so key it
+  // "unknown" instead of trusting any value in the header.
+  const parsed = runInFreshProcess(
+    { TRUSTED_PROXY_HOPS: "3" },
+    `import { clientKeyFromHeaders } from "./lib/rateLimit.js";
+     console.log(JSON.stringify({
+       tooShort: clientKeyFromHeaders(new Headers({ "x-forwarded-for": "1.1.1.1, 10.0.0.1" })),
+       exact: clientKeyFromHeaders(new Headers({ "x-forwarded-for": "1.1.1.1, 10.0.0.1, 10.0.0.2" })),
+     }));`,
+  );
+  assert.equal(parsed.tooShort, "unknown");
+  // With three trusted hops the client is the third entry from the end.
+  assert.equal(parsed.exact, "1.1.1.1");
+});
+
+test("the default single trusted hop still keys on the right-most forwarded entry", () => {
+  // Guards against the fix changing the documented default behaviour: with one
+  // trusted proxy the right-most entry is the client.
+  const parsed = runInFreshProcess(
+    {},
+    `import { clientKeyFromHeaders } from "./lib/rateLimit.js";
+     console.log(JSON.stringify({
+       key: clientKeyFromHeaders(new Headers({ "x-forwarded-for": "1.1.1.1, 10.0.0.1" })),
+     }));`,
+  );
+  assert.equal(parsed.key, "10.0.0.1");
 });
