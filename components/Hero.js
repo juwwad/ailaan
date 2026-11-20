@@ -20,9 +20,7 @@ import {
   LANGUAGES,
   NEUTRAL_RISK,
   RISK_META,
-  STALE_RISK,
   SUBSCRIBE_COPY,
-  UNKNOWN_RISK,
   ctaAction,
   districtName,
   parseStatusResponse,
@@ -30,6 +28,7 @@ import {
   presentationTier,
   readingLine,
   riskFromStatus,
+  riskPresentation,
   speechLang,
 } from "@/lib/alerts";
 
@@ -77,20 +76,13 @@ export default function Hero() {
   const tier = isReady ? presentationTier(demo.statusBody) : null;
   // A ready reading with no recognised risk is "unknown", not "not checked yet".
   // A stale reading is neutral and labelled "out of date" — never a risk colour.
-  const risk =
-    (tier !== "stale" && riskKey && RISK_META[riskKey]) ||
-    (isReady ? (tier === "stale" ? STALE_RISK : UNKNOWN_RISK) : NEUTRAL_RISK);
+  const { risk, iconKey } = riskPresentation(tier, riskKey);
   // Built with createElement rather than a capitalised local, so no component is
   // defined during render (react-hooks/static-components).
-  const riskIcon = createElement(
-    tier !== "stale" && riskKey ? RISK_ICONS[riskKey] : Info,
-    {
-      size: 20,
-      color: risk.color,
-    },
-  );
-  const riskLabel =
-    tier === "simulated" && riskKey ? `Sample: ${risk.label}` : risk.label;
+  const riskIcon = createElement(iconKey ? RISK_ICONS[iconKey] : Info, {
+    size: 20,
+    color: risk.color,
+  });
 
   const content = DISTRICT_CONTENT[selected];
   const reading = isReady
@@ -389,7 +381,7 @@ export default function Hero() {
                   className="w-fit rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
                   style={{ background: `${risk.color}22`, color: risk.color }}
                 >
-                  {riskLabel}
+                  {risk.label}
                 </span>
               </div>
             </div>

@@ -4,8 +4,11 @@ import {
   DEMO_DISTRICTS,
   LANGUAGES,
   MAX_READING_AGE_MS,
+  NEUTRAL_RISK,
   RISK_META,
+  STALE_RISK,
   SUBSCRIBE_COPY,
+  UNKNOWN_RISK,
   buildAlert,
   ctaAction,
   dataTier,
@@ -15,6 +18,7 @@ import {
   presentationTier,
   readingLine,
   riskFromStatus,
+  riskPresentation,
   trendLabel,
 } from "../lib/alerts.js";
 import { DISTRICT_KEYS, DISTRICTS } from "../lib/districts.js";
@@ -204,6 +208,32 @@ test("presentationTier separates live, stale and simulated readings (#74)", () =
     "stale",
   );
   assert.equal(presentationTier({ source: "simulated" }, now), "simulated");
+});
+
+test("riskPresentation keeps a stale reading neutral and never a risk colour", () => {
+  // Even with a recognised risk key, a stale reading must not show that colour.
+  const stale = riskPresentation("stale", "high");
+  assert.equal(stale.risk, STALE_RISK);
+  assert.equal(stale.iconKey, null);
+  assert.notEqual(stale.risk.color, RISK_META.high.color);
+});
+
+test("riskPresentation labels simulated risk as a sample and live risk plainly", () => {
+  assert.deepEqual(riskPresentation("simulated", "high"), {
+    risk: { ...RISK_META.high, label: `Sample: ${RISK_META.high.label}` },
+    iconKey: "high",
+  });
+  assert.deepEqual(riskPresentation("live", "medium"), {
+    risk: RISK_META.medium,
+    iconKey: "medium",
+  });
+});
+
+test("riskPresentation is neutral before a reading and unknown once one arrives", () => {
+  // tier is null until a reading arrives: nothing has been checked yet.
+  assert.deepEqual(riskPresentation(null, null), { risk: NEUTRAL_RISK, iconKey: null });
+  // A ready reading with no recognised risk is unknown, never a green all-clear.
+  assert.deepEqual(riskPresentation("live", null), { risk: UNKNOWN_RISK, iconKey: null });
 });
 
 test("a stale live reading is never spoken or shown as a current warning (#74)", () => {
