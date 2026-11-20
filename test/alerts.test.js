@@ -129,6 +129,16 @@ test("buildAlert returns null for a district it has no copy for", () => {
   assert.equal(buildAlert("atlantis", "high"), null);
 });
 
+test("district lookups do not resolve inherited Object.prototype keys", () => {
+  // Plain indexing would read Object.prototype members, so "constructor" would
+  // return a name ("Object") and buildAlert would fabricate a warning whose
+  // river/landmark are the literal string "undefined" (#87).
+  for (const key of ["constructor", "toString", "hasOwnProperty", "valueOf"]) {
+    assert.equal(districtName(key), key, `districtName(${key}) must echo the key`);
+    assert.equal(buildAlert(key, "high"), null, `buildAlert(${key}) must be null`);
+  }
+});
+
 test("all Roman-Pashto alert text uses ASCII characters only", () => {
   // Include the unknown-risk branch (riskKey null): it renders UNKNOWN_NOTICE,
   // which is reachable on a live reading with an unrecognised severity (#84).
