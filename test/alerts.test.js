@@ -2,19 +2,30 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   DEMO_DISTRICTS,
+  DISTRICT_CONTENT,
   LANGUAGES,
+  MAX_READING_AGE_MS,
+  NEUTRAL_RISK,
   RISK_META,
   SIMULATED_NOTICE,
+  STALE_NOTICE,
+  STALE_RISK,
   SUBSCRIBE_COPY,
+  UNAVAILABLE_NOTICE,
   UNKNOWN_NOTICE,
+  UNKNOWN_RISK,
+  alertSpeech,
   buildAlert,
   ctaAction,
   dataTier,
   districtName,
   documentLanguage,
+  isStale,
   parseStatusResponse,
+  presentationTier,
   readingLine,
   riskFromStatus,
+  riskPresentation,
   trendLabel,
 } from "../lib/alerts.js";
 import { DISTRICT_KEYS, DISTRICTS } from "../lib/districts.js";
@@ -61,6 +72,39 @@ test("buildAlert picks the wording for the supplied risk level", () => {
 
   const low = buildAlert("swat", "low");
   assert.match(low.en, /^Calm/);
+});
+
+test("active-risk copy never contradicts itself with a no-rise window (#77)", () => {
+  // Swat and Mardan once carried the calm-case phrase "no rise expected yet",
+  // which the high/medium templates splice after "…will reach knee to waist
+  // depth" / "…may flood" — a warning that contradicted itself mid-sentence.
+  for (const district of DEMO_DISTRICTS) {
+    const window = DISTRICT_CONTENT[district].window;
+    assert.doesNotMatch(
+      window,
+      /no rise expected/i,
+      `${district} window must not be a no-rise phrase`,
+    );
+    assert.match(
+      window,
+      /\d/,
+      `${district} window should name a time frame`,
+    );
+    for (const risk of ["high", "medium"]) {
+      const alert = buildAlert(district, risk);
+      for (const lang of ["en", "roman", "ps"]) {
+        assert.doesNotMatch(
+          alert[lang],
+          /no rise expected/i,
+          `${district} ${risk} ${lang} must not say "no rise expected"`,
+        );
+        assert.ok(
+          alert[lang].includes(window),
+          `${district} ${risk} ${lang} should state the district window`,
+        );
+      }
+    }
+  }
 });
 
 test("buildAlert never derives a risk level on its own", () => {
@@ -112,8 +156,17 @@ test("Roman-Pashto UI copy outside buildAlert is ASCII-only", () => {
       );
     }
   }
-  assert.match(UNKNOWN_NOTICE.roman, /^[\x00-\x7F]*$/, "UNKNOWN_NOTICE.roman should be ASCII");
-  assert.match(SIMULATED_NOTICE.roman, /^[\x00-\x7F]*$/, "SIMULATED_NOTICE.roman should be ASCII");
+  // Every spoken/visible Roman-Pashto string, not just the ones that existed
+  // when this test was written: a new notice must not reintroduce a non-ASCII
+  // dash (the bug #84 fixes).
+  for (const [name, notice] of Object.entries({
+    UNKNOWN_NOTICE,
+    SIMULATED_NOTICE,
+    STALE_NOTICE,
+    UNAVAILABLE_NOTICE,
+  })) {
+    assert.match(notice.roman, /^[\x00-\x7F]*$/, `${name}.roman should be ASCII`);
+  }
 });
 
 test("sample alerts are prefixed with the spoken caveat in every language", () => {
@@ -172,20 +225,100 @@ test("ctaAction replays when a reading is already shown, otherwise loads", () =>
 test("parseStatusResponse keeps a live unknown severity readable (#53)", () => {
   // A successful live fetch whose severity is unrecognised must not be turned
   // into a connectivity failure: the honest unknown-risk copy must render.
+  const now = Date.parse("2026-06-01T12:00:00Z");
   const live = {
     district: "nowshera",
     risk: null,
     severity: "SEVERITY_UNKNOWN",
     source: "google-flood-forecasting",
+    issuedTime: new Date(now - 60_000).toISOString(),
   };
-  const parsed = parseStatusResponse("nowshera", live);
+  const parsed = parseStatusResponse("nowshera", live, now);
   assert.equal(parsed.ok, true);
   assert.equal(parsed.status, "ready");
+  assert.equal(parsed.tier, "live");
   assert.equal(parsed.statusBody, live);
   assert.equal(riskFromStatus(parsed.statusBody), null);
   assert.equal(dataTier(parsed.statusBody), "live");
   assert.match(parsed.alert.en, /^Risk unknown/);
   assert.doesNotMatch(parsed.alert.en, /^Calm/);
+});
+
+test("isStale treats a missing, unparseable or old timestamp as stale (#74)", () => {
+  const now = Date.parse("2026-06-01T12:00:00Z");
+  assert.equal(isStale(undefined, now), true);
+  assert.equal(isStale(null, now), true);
+  assert.equal(isStale("", now), true);
+  assert.equal(isStale("not-a-date", now), true);
+  assert.equal(isStale(new Date(now - 60_000).toISOString(), now), false);
+  assert.equal(
+    isStale(new Date(now - MAX_READING_AGE_MS - 1).toISOString(), now),
+    true,
+  );
+});
+
+test("presentationTier separates live, stale and simulated readings (#74)", () => {
+  const now = Date.parse("2026-06-01T12:00:00Z");
+  const live = {
+    source: "google-flood-forecasting",
+    issuedTime: new Date(now - 60_000).toISOString(),
+  };
+  assert.equal(presentationTier(live, now), "live");
+  assert.equal(
+    presentationTier({ ...live, issuedTime: new Date(now - 8 * 3600_000).toISOString() }, now),
+    "stale",
+  );
+  // A live source with no usable timestamp cannot be trusted as current.
+  assert.equal(
+    presentationTier({ source: "google-flood-forecasting", issuedTime: null }, now),
+    "stale",
+  );
+  assert.equal(presentationTier({ source: "simulated" }, now), "simulated");
+});
+
+test("riskPresentation keeps a stale reading neutral and never a risk colour", () => {
+  // Even with a recognised risk key, a stale reading must not show that colour.
+  const stale = riskPresentation("stale", "high");
+  assert.equal(stale.risk, STALE_RISK);
+  assert.equal(stale.iconKey, null);
+  assert.notEqual(stale.risk.color, RISK_META.high.color);
+});
+
+test("riskPresentation labels simulated risk as a sample and live risk plainly", () => {
+  assert.deepEqual(riskPresentation("simulated", "high"), {
+    risk: { ...RISK_META.high, label: `Sample: ${RISK_META.high.label}` },
+    iconKey: "high",
+  });
+  assert.deepEqual(riskPresentation("live", "medium"), {
+    risk: RISK_META.medium,
+    iconKey: "medium",
+  });
+});
+
+test("riskPresentation is neutral before a reading and unknown once one arrives", () => {
+  // tier is null until a reading arrives: nothing has been checked yet.
+  assert.deepEqual(riskPresentation(null, null), { risk: NEUTRAL_RISK, iconKey: null });
+  // A ready reading with no recognised risk is unknown, never a green all-clear.
+  assert.deepEqual(riskPresentation("live", null), { risk: UNKNOWN_RISK, iconKey: null });
+});
+
+test("a stale live reading is never spoken or shown as a current warning (#74)", () => {
+  const now = Date.parse("2026-06-01T12:00:00Z");
+  const stale = {
+    district: "nowshera",
+    risk: "high",
+    severity: "SEVERITY_ALERT",
+    source: "google-flood-forecasting",
+    issuedTime: new Date(now - 8 * 3600_000).toISOString(),
+  };
+  const parsed = parseStatusResponse("nowshera", stale, now);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.tier, "stale");
+  // The high-risk wording must not be used for an out-of-date reading.
+  assert.doesNotMatch(parsed.alert.en, /^Urgent/);
+  assert.match(parsed.alert.en, /out of date/i);
+  // The reading line must say so too, instead of the trend.
+  assert.match(readingLine({ river: "Kabul River" }, stale, "stale"), /out of date/i);
 });
 
 test("parseStatusResponse fails safe on an unreadable body", () => {

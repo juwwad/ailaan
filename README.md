@@ -56,7 +56,10 @@ caches successful live results, and returns simulated data (flagged
 Response: `{ "district", "risk", "severity", "gaugeLocation", "issuedTime",
 "forecastTrend", "hasInundationMap", "source" }`. `source` is
 `google-flood-forecasting` (live) or `simulated`. The UI must label simulated
-responses rather than present them as a real warning.
+responses rather than present them as a real warning. A live reading whose
+`issuedTime` is missing, unparseable, or older than `MAX_READING_AGE_MS`
+(`lib/alerts.js`, 6 h) is treated as `stale` — shown and spoken as out of date,
+never as a current warning (#74).
 
 Errors: `400` unknown/missing district or malformed JSON, `429` rate limited.
 
