@@ -379,9 +379,18 @@ test("every UI language declares a BCP-47 lang tag", () => {
 
 test("documentLanguage reflects the selected language, not always English (#39)", () => {
   assert.deepEqual(documentLanguage("en"), { lang: "en", dir: "ltr" });
-  assert.deepEqual(documentLanguage("ps"), { lang: "ps", dir: "rtl" });
+  assert.equal(documentLanguage("ps").lang, "ps");
   // Roman Pashto is Latin script and reads left-to-right.
   assert.deepEqual(documentLanguage("roman"), { lang: "ps-Latn", dir: "ltr" });
+});
+
+test("the document stays LTR in every language so Pashto does not mirror the page (#104)", () => {
+  for (const { key } of LANGUAGES) {
+    assert.equal(documentLanguage(key).dir, "ltr", `document dir for ${key}`);
+  }
+  // Pashto *text* still declares RTL so its own bidi is correct; the document
+  // direction above is what must not follow it.
+  assert.equal(LANGUAGES.find((l) => l.key === "ps").dir, "rtl");
 });
 
 test("documentLanguage falls back to English for an unknown language", () => {
