@@ -16,6 +16,7 @@ import {
   UNKNOWN_RISK,
   alertSpeech,
   buildAlert,
+  controlLabel,
   ctaAction,
   dataTier,
   districtName,
@@ -375,6 +376,35 @@ test("every UI language declares a BCP-47 lang tag", () => {
     const { lang } = documentLanguage(key);
     assert.match(lang, /^[a-z]{2}(-[A-Za-z]+)?$/, `bad lang for ${key}`);
   }
+});
+
+test("control accessible names exist for every UI language and are translated (#88)", () => {
+  for (const { key } of LANGUAGES) {
+    const district = controlLabel(key, "district", "Nowshera");
+    const speak = controlLabel(key, "speak");
+    assert.ok(district.trim().length > 0, `empty district label for ${key}`);
+    assert.ok(speak.trim().length > 0, `empty speak label for ${key}`);
+    // The district name must be substituted in, not left as the raw placeholder.
+    assert.doesNotMatch(district, /\{name\}/, `${key} left {name} unsubstituted`);
+    assert.match(district, /Nowshera/);
+  }
+  // A screen-reader user in Pashto/Roman must not hear the English string.
+  assert.notEqual(controlLabel("ps", "speak"), controlLabel("en", "speak"));
+  assert.notEqual(controlLabel("roman", "speak"), controlLabel("en", "speak"));
+  assert.notEqual(
+    controlLabel("ps", "district", "Swat"),
+    controlLabel("en", "district", "Swat"),
+  );
+});
+
+test("control copy falls back to English for an unknown language", () => {
+  assert.equal(controlLabel("fr", "speak"), controlLabel("en", "speak"));
+  assert.equal(controlLabel(undefined, "speak"), controlLabel("en", "speak"));
+});
+
+test("Roman-Pashto control labels are pure ASCII", () => {
+  assert.match(controlLabel("roman", "district", "Mardan"), /^[\x00-\x7F]*$/);
+  assert.match(controlLabel("roman", "speak"), /^[\x00-\x7F]*$/);
 });
 
 test("documentLanguage reflects the selected language, not always English (#39)", () => {
