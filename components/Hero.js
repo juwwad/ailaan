@@ -468,7 +468,7 @@ export default function Hero() {
                 </span>
               )}
               {demo.status === "ready" && (
-                <span className="animate-rise line-clamp-3">
+                <span className="animate-rise">
                   {demo.alert[lang]}
                 </span>
               )}
