@@ -24,6 +24,7 @@ import {
   alertSpeech,
   controlLabel,
   ctaAction,
+  currentAlert,
   districtName,
   documentLanguage,
   parseStatusResponse,
@@ -71,15 +72,19 @@ export default function Hero() {
   const selectedRef = useRef("nowshera");
 
   const isReady = demo.status === "ready";
-  // Whether pressing play produces audio. The error state now speaks the
-  // "unreachable" warning, so it must not leave the audio control disabled.
-  const speakable = alertSpeech(demo.status, demo.alert, lang) !== null;
   // Undefined until a reading arrives, so the card stays neutral on idle/error
   // instead of borrowing a hardcoded risk colour.
   const riskKey = isReady ? riskFromStatus(demo.statusBody) : null;
   // "live" only when the reading is genuinely current; a stale live reading is
   // its own tier so it can never render as a fresh warning (#74).
   const tier = isReady ? presentationTier(demo.statusBody) : null;
+  // Resolve the text against the tier being presented right now, not the tier at
+  // fetch time: a live reading that ages out while the page is open must stop
+  // being shown and spoken as a current warning (#110).
+  const alert = isReady ? currentAlert(demo.alert, tier) : demo.alert;
+  // Whether pressing play produces audio. The error state now speaks the
+  // "unreachable" warning, so it must not leave the audio control disabled.
+  const speakable = alertSpeech(demo.status, alert, lang) !== null;
   // A ready reading with no recognised risk is "unknown", not "not checked yet".
   // A stale reading is neutral and labelled "out of date" — never a risk colour.
   const { risk, iconKey } = riskPresentation(tier, riskKey);
@@ -152,7 +157,7 @@ export default function Hero() {
   );
 
   const speak = () => {
-    const text = alertSpeech(demo.status, demo.alert, lang);
+    const text = alertSpeech(demo.status, alert, lang);
     if (!text || typeof window === "undefined") return;
     if (!("speechSynthesis" in window)) return;
     // Cancel any in-flight utterance so a second press does not queue audio
@@ -212,7 +217,7 @@ export default function Hero() {
     // always (re)play. When a reading is already on screen for the selected
     // district, checkStatus() is a no-op and the speak-on-ready effect never
     // fires again — replay it directly instead of silently doing nothing.
-    if (ctaAction({ status: demo.status, hasAlert: Boolean(demo.alert) }) === "replay") {
+    if (ctaAction({ status: demo.status, hasAlert: Boolean(alert) }) === "replay") {
       speak();
       return;
     }
@@ -469,7 +474,7 @@ export default function Hero() {
               )}
               {demo.status === "ready" && (
                 <span className="animate-rise line-clamp-3">
-                  {demo.alert[lang]}
+                  {alert?.[lang]}
                 </span>
               )}
             </div>
