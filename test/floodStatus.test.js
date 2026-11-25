@@ -159,6 +159,22 @@ test("simulatedStatus maps each risk level to the matching severity", () => {
   }
 });
 
+test("boundingBox rejects inherited Object.prototype keys (#113)", () => {
+  assert.equal(boundingBox("constructor"), null);
+  assert.equal(boundingBox("__proto__"), null);
+});
+
+test("simulatedStatus never simulates an unknown district as a low all-clear (#113)", () => {
+  for (const key of ["nope", "constructor", "__proto__"]) {
+    const s = simulatedStatus(key);
+    assert.equal(s.risk, null, `${key} risk`);
+    assert.equal(s.severity, "SEVERITY_UNKNOWN", `${key} severity`);
+    assert.equal(s.gaugeLocation, null, `${key} gaugeLocation`);
+    assert.equal(s.simulated, true, `${key} simulated flag`);
+    assert.equal(s.source, "simulated", `${key} source`);
+  }
+});
+
 test("fetchLiveFloodStatus throws on a non-OK upstream response", async () => {
   const original = globalThis.fetch;
   globalThis.fetch = async () => ({ ok: false, status: 403 });
