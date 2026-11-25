@@ -91,6 +91,34 @@ test("normalizeFloodStatuses ranks an unrecognised severity above normal", () =>
   assert.equal(out.severity, "SOMETHING_ELSE");
 });
 
+test("normalizeFloodStatuses ignores null/undefined entries instead of throwing", () => {
+  // A malformed gauge entry must not discard the whole live reading: the
+  // remaining gauges are still ranked, and the caller keeps a real live result
+  // instead of degrading to labeled simulated data.
+  const withNullFirst = normalizeFloodStatuses([
+    null,
+    { severity: "SEVERITY_NORMAL" },
+  ]);
+  assert.equal(withNullFirst.risk, "low");
+  assert.equal(withNullFirst.severity, "SEVERITY_NORMAL");
+
+  const withNullLast = normalizeFloodStatuses([
+    { severity: "SEVERITY_ALERT", gaugeLocation: "alert gauge" },
+    undefined,
+  ]);
+  assert.equal(withNullLast.risk, "high");
+  assert.equal(withNullLast.gaugeLocation, "alert gauge");
+});
+
+test("normalizeFloodStatuses returns null when every entry is invalid", () => {
+  // No usable gauge -> null, so the caller falls back rather than reporting a
+  // fabricated risk from a non-object element.
+  assert.equal(normalizeFloodStatuses([null]), null);
+  assert.equal(normalizeFloodStatuses([undefined]), null);
+  assert.equal(normalizeFloodStatuses([null, undefined]), null);
+  assert.equal(normalizeFloodStatuses(["nope", 42]), null);
+});
+
 test("isValidDistrict accepts known keys and rejects others", () => {
   for (const key of DISTRICT_KEYS) assert.equal(isValidDistrict(key), true);
   assert.equal(isValidDistrict("karachi"), false);

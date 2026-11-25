@@ -15,6 +15,13 @@ async function loadHeaders(nodeEnv) {
   }
 }
 
+test("the framework fingerprint header is disabled", async () => {
+  // X-Powered-By: Next.js is on by default; the hardening suite should not
+  // leave the framework version advertised on every page and API response.
+  const mod = await import(`../next.config.mjs?env=powered-by-${Math.random()}`);
+  assert.equal(mod.default.poweredByHeader, false);
+});
+
 test("sets the standard hardening headers on every path", async () => {
   const headers = await loadHeaders("production");
   assert.equal(headers["X-Content-Type-Options"], "nosniff");

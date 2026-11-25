@@ -4,18 +4,29 @@ import {
   DEMO_DISTRICTS,
   DISTRICT_CONTENT,
   LANGUAGES,
+  MAX_READING_AGE_MS,
+  NEUTRAL_RISK,
   RISK_META,
+  SIMULATED_NOTICE,
+  STALE_NOTICE,
+  STALE_RISK,
   SUBSCRIBE_COPY,
   UNAVAILABLE_NOTICE,
+  UNKNOWN_NOTICE,
+  UNKNOWN_RISK,
   alertSpeech,
   buildAlert,
+  controlLabel,
   ctaAction,
   dataTier,
   districtName,
   documentLanguage,
+  isStale,
   parseStatusResponse,
+  presentationTier,
   readingLine,
   riskFromStatus,
+  riskPresentation,
   trendLabel,
 } from "../lib/alerts.js";
 import { DISTRICT_KEYS, DISTRICTS } from "../lib/districts.js";
@@ -119,9 +130,21 @@ test("buildAlert returns null for a district it has no copy for", () => {
   assert.equal(buildAlert("atlantis", "high"), null);
 });
 
+test("district lookups do not resolve inherited Object.prototype keys", () => {
+  // Plain indexing would read Object.prototype members, so "constructor" would
+  // return a name ("Object") and buildAlert would fabricate a warning whose
+  // river/landmark are the literal string "undefined" (#87).
+  for (const key of ["constructor", "toString", "hasOwnProperty", "valueOf"]) {
+    assert.equal(districtName(key), key, `districtName(${key}) must echo the key`);
+    assert.equal(buildAlert(key, "high"), null, `buildAlert(${key}) must be null`);
+  }
+});
+
 test("all Roman-Pashto alert text uses ASCII characters only", () => {
+  // Include the unknown-risk branch (riskKey null): it renders UNKNOWN_NOTICE,
+  // which is reachable on a live reading with an unrecognised severity (#84).
   for (const district of DEMO_DISTRICTS) {
-    for (const risk of ["high", "medium", "low"]) {
+    for (const risk of ["high", "medium", "low", null]) {
       for (const sample of [false, true]) {
         assert.match(
           buildAlert(district, risk, sample).roman,
@@ -133,15 +156,28 @@ test("all Roman-Pashto alert text uses ASCII characters only", () => {
   }
 });
 
-test("the unreachable-service Roman-Pashto notice is ASCII-only", () => {
-  // The ASCII invariant covers all Roman-Pashto copy, not just buildAlert output.
-  // UNAVAILABLE_NOTICE shipped a non-ASCII em dash because the per-string checks
-  // never enumerated it (#93). (UNKNOWN_NOTICE/SUBSCRIBE_COPY are handled by #84.)
-  assert.match(
-    UNAVAILABLE_NOTICE.roman,
-    /^[\x00-\x7F]*$/,
-    "UNAVAILABLE_NOTICE.roman should be ASCII",
-  );
+test("Roman-Pashto UI copy outside buildAlert is ASCII-only", () => {
+  for (const [key, copy] of Object.entries(SUBSCRIBE_COPY)) {
+    if (key === "ps") continue; // Pashto is Perso-Arabic script, not Roman.
+    for (const [field, value] of Object.entries(copy)) {
+      assert.match(
+        value,
+        /^[\x00-\x7F]*$/,
+        `SUBSCRIBE_COPY.${key}.${field} should be ASCII`,
+      );
+    }
+  }
+  // Every spoken/visible Roman-Pashto string, not just the ones that existed
+  // when this test was written: a new notice must not reintroduce a non-ASCII
+  // dash (the bug #84 fixes).
+  for (const [name, notice] of Object.entries({
+    UNKNOWN_NOTICE,
+    SIMULATED_NOTICE,
+    STALE_NOTICE,
+    UNAVAILABLE_NOTICE,
+  })) {
+    assert.match(notice.roman, /^[\x00-\x7F]*$/, `${name}.roman should be ASCII`);
+  }
 });
 
 test("sample alerts are prefixed with the spoken caveat in every language", () => {
@@ -200,20 +236,100 @@ test("ctaAction replays when a reading is already shown, otherwise loads", () =>
 test("parseStatusResponse keeps a live unknown severity readable (#53)", () => {
   // A successful live fetch whose severity is unrecognised must not be turned
   // into a connectivity failure: the honest unknown-risk copy must render.
+  const now = Date.parse("2026-06-01T12:00:00Z");
   const live = {
     district: "nowshera",
     risk: null,
     severity: "SEVERITY_UNKNOWN",
     source: "google-flood-forecasting",
+    issuedTime: new Date(now - 60_000).toISOString(),
   };
-  const parsed = parseStatusResponse("nowshera", live);
+  const parsed = parseStatusResponse("nowshera", live, now);
   assert.equal(parsed.ok, true);
   assert.equal(parsed.status, "ready");
+  assert.equal(parsed.tier, "live");
   assert.equal(parsed.statusBody, live);
   assert.equal(riskFromStatus(parsed.statusBody), null);
   assert.equal(dataTier(parsed.statusBody), "live");
   assert.match(parsed.alert.en, /^Risk unknown/);
   assert.doesNotMatch(parsed.alert.en, /^Calm/);
+});
+
+test("isStale treats a missing, unparseable or old timestamp as stale (#74)", () => {
+  const now = Date.parse("2026-06-01T12:00:00Z");
+  assert.equal(isStale(undefined, now), true);
+  assert.equal(isStale(null, now), true);
+  assert.equal(isStale("", now), true);
+  assert.equal(isStale("not-a-date", now), true);
+  assert.equal(isStale(new Date(now - 60_000).toISOString(), now), false);
+  assert.equal(
+    isStale(new Date(now - MAX_READING_AGE_MS - 1).toISOString(), now),
+    true,
+  );
+});
+
+test("presentationTier separates live, stale and simulated readings (#74)", () => {
+  const now = Date.parse("2026-06-01T12:00:00Z");
+  const live = {
+    source: "google-flood-forecasting",
+    issuedTime: new Date(now - 60_000).toISOString(),
+  };
+  assert.equal(presentationTier(live, now), "live");
+  assert.equal(
+    presentationTier({ ...live, issuedTime: new Date(now - 8 * 3600_000).toISOString() }, now),
+    "stale",
+  );
+  // A live source with no usable timestamp cannot be trusted as current.
+  assert.equal(
+    presentationTier({ source: "google-flood-forecasting", issuedTime: null }, now),
+    "stale",
+  );
+  assert.equal(presentationTier({ source: "simulated" }, now), "simulated");
+});
+
+test("riskPresentation keeps a stale reading neutral and never a risk colour", () => {
+  // Even with a recognised risk key, a stale reading must not show that colour.
+  const stale = riskPresentation("stale", "high");
+  assert.equal(stale.risk, STALE_RISK);
+  assert.equal(stale.iconKey, null);
+  assert.notEqual(stale.risk.color, RISK_META.high.color);
+});
+
+test("riskPresentation labels simulated risk as a sample and live risk plainly", () => {
+  assert.deepEqual(riskPresentation("simulated", "high"), {
+    risk: { ...RISK_META.high, label: `Sample: ${RISK_META.high.label}` },
+    iconKey: "high",
+  });
+  assert.deepEqual(riskPresentation("live", "medium"), {
+    risk: RISK_META.medium,
+    iconKey: "medium",
+  });
+});
+
+test("riskPresentation is neutral before a reading and unknown once one arrives", () => {
+  // tier is null until a reading arrives: nothing has been checked yet.
+  assert.deepEqual(riskPresentation(null, null), { risk: NEUTRAL_RISK, iconKey: null });
+  // A ready reading with no recognised risk is unknown, never a green all-clear.
+  assert.deepEqual(riskPresentation("live", null), { risk: UNKNOWN_RISK, iconKey: null });
+});
+
+test("a stale live reading is never spoken or shown as a current warning (#74)", () => {
+  const now = Date.parse("2026-06-01T12:00:00Z");
+  const stale = {
+    district: "nowshera",
+    risk: "high",
+    severity: "SEVERITY_ALERT",
+    source: "google-flood-forecasting",
+    issuedTime: new Date(now - 8 * 3600_000).toISOString(),
+  };
+  const parsed = parseStatusResponse("nowshera", stale, now);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.tier, "stale");
+  // The high-risk wording must not be used for an out-of-date reading.
+  assert.doesNotMatch(parsed.alert.en, /^Urgent/);
+  assert.match(parsed.alert.en, /out of date/i);
+  // The reading line must say so too, instead of the trend.
+  assert.match(readingLine({ river: "Kabul River" }, stale, "stale"), /out of date/i);
 });
 
 test("parseStatusResponse fails safe on an unreadable body", () => {
@@ -260,6 +376,35 @@ test("every UI language declares a BCP-47 lang tag", () => {
     const { lang } = documentLanguage(key);
     assert.match(lang, /^[a-z]{2}(-[A-Za-z]+)?$/, `bad lang for ${key}`);
   }
+});
+
+test("control accessible names exist for every UI language and are translated (#88)", () => {
+  for (const { key } of LANGUAGES) {
+    const district = controlLabel(key, "district", "Nowshera");
+    const speak = controlLabel(key, "speak");
+    assert.ok(district.trim().length > 0, `empty district label for ${key}`);
+    assert.ok(speak.trim().length > 0, `empty speak label for ${key}`);
+    // The district name must be substituted in, not left as the raw placeholder.
+    assert.doesNotMatch(district, /\{name\}/, `${key} left {name} unsubstituted`);
+    assert.match(district, /Nowshera/);
+  }
+  // A screen-reader user in Pashto/Roman must not hear the English string.
+  assert.notEqual(controlLabel("ps", "speak"), controlLabel("en", "speak"));
+  assert.notEqual(controlLabel("roman", "speak"), controlLabel("en", "speak"));
+  assert.notEqual(
+    controlLabel("ps", "district", "Swat"),
+    controlLabel("en", "district", "Swat"),
+  );
+});
+
+test("control copy falls back to English for an unknown language", () => {
+  assert.equal(controlLabel("fr", "speak"), controlLabel("en", "speak"));
+  assert.equal(controlLabel(undefined, "speak"), controlLabel("en", "speak"));
+});
+
+test("Roman-Pashto control labels are pure ASCII", () => {
+  assert.match(controlLabel("roman", "district", "Mardan"), /^[\x00-\x7F]*$/);
+  assert.match(controlLabel("roman", "speak"), /^[\x00-\x7F]*$/);
 });
 
 test("documentLanguage reflects the selected language, not always English (#39)", () => {
