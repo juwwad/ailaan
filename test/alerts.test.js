@@ -61,6 +61,14 @@ test("trendLabel names known trends and passes through unknown ones", () => {
   assert.equal(trendLabel("FALLING"), "Falling");
   assert.equal(trendLabel("WIBBLE"), "WIBBLE");
   assert.equal(trendLabel(null), null);
+  // Inherited Object.prototype keys are not trends; they must pass through as
+  // the string they are rather than resolve to a native function (#108).
+  assert.equal(trendLabel("constructor"), "constructor");
+  assert.equal(trendLabel("toString"), "toString");
+  assert.equal(
+    readingLine({ river: "Kabul River" }, { forecastTrend: "constructor" }, "live"),
+    "Kabul River · constructor",
+  );
 });
 
 test("buildAlert picks the wording for the supplied risk level", () => {
