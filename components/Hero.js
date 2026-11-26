@@ -264,7 +264,7 @@ export default function Hero() {
               <span className="text-lg font-bold tracking-tight text-mist sm:text-xl">
                 Ailaan
               </span>
-              <span className="hidden text-[11px] font-medium text-mist/50 sm:block">
+              <span className="hidden text-[11px] font-medium text-mist/55 sm:block">
                 Flood alerts for KPK
               </span>
             </div>
@@ -286,7 +286,7 @@ export default function Hero() {
               rel="noopener noreferrer"
               className="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/6 px-3 py-2 text-xs font-semibold text-mist/90 backdrop-blur-xl transition hover:bg-white/12 sm:text-sm"
             >
-              <span className="hidden text-mist/50 sm:inline">By</span>{" "}
+              <span className="hidden text-mist/55 sm:inline">By</span>{" "}
               Jawad Ahmad
             </a>
           </nav>
@@ -319,7 +319,7 @@ export default function Hero() {
               >
                 Hear a warning
               </button>
-              <span className="hidden text-xs text-mist/50 sm:inline sm:text-sm">
+              <span className="hidden text-xs text-mist/55 sm:inline sm:text-sm">
                 Try the demo — pick any district on the right →
               </span>
             </div>
@@ -340,7 +340,7 @@ export default function Hero() {
           {/* Right: interactive glass demo */}
           <div className="flex w-full max-w-lg shrink-0 flex-col gap-2.5 rounded-3xl border border-white/15 bg-white/[0.07] p-3.5 shadow-2xl backdrop-blur-2xl sm:gap-4 sm:p-6 md:w-[46%] lg:w-[40%]">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-mist/50">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-mist/55">
                 Try it — tap a district
               </span>
             </div>
@@ -392,7 +392,7 @@ export default function Hero() {
                 <span className="text-sm font-bold text-mist sm:text-lg">
                   {districtName(selected)}
                 </span>
-                <span className="font-mono text-[10px] text-mist/50 sm:text-[11px]">
+                <span className="font-mono text-[10px] text-mist/55 sm:text-[11px]">
                   {reading || `${content?.river} · not read yet`}
                 </span>
                 <span
@@ -427,7 +427,7 @@ export default function Hero() {
                   className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
                     lang === l.key
                       ? "bg-white/20 text-mist"
-                      : "bg-white/4 text-mist/50 hover:bg-white/10"
+                      : "bg-white/4 text-mist/55 hover:bg-white/10"
                   }`}
                 >
                   {l.label}
@@ -442,10 +442,10 @@ export default function Hero() {
               dir={LANGUAGES.find((l) => l.key === lang)?.dir || "ltr"}
             >
               {demo.status === "loading" && (
-                <span className="text-mist/40">Reading the river…</span>
+                <span className="text-mist/55">Reading the river…</span>
               )}
               {demo.status === "idle" && (
-                <span className="text-mist/40">
+                <span className="text-mist/55">
                   Pick a district above, then press play — you&rsquo;ll hear
                   the warning out loud.
                 </span>
@@ -488,7 +488,7 @@ export default function Hero() {
               >
                 <Volume2 size={18} />
               </button>
-              <p className="text-[11px] text-mist/50">
+              <p className="text-[11px] text-mist/55">
                 Works even if you can&rsquo;t read — press play to listen.
               </p>
             </div>
@@ -522,7 +522,7 @@ export default function Hero() {
                     aria-label={subscribeCopy.input}
                     aria-invalid={phoneError}
                     aria-describedby={phoneError ? "subscribe-error" : undefined}
-                    className={`min-w-0 flex-1 rounded-full border bg-white/5 px-3 py-1.5 text-xs text-mist placeholder:text-mist/35 outline-none focus:border-signal/60 ${
+                    className={`min-w-0 flex-1 rounded-full border bg-white/5 px-3 py-1.5 text-xs text-mist placeholder:text-mist/55 outline-none focus:border-signal/60 ${
                       phoneError ? "border-risk-high/70" : "border-white/15"
                     }`}
                   />
