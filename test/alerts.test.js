@@ -18,6 +18,7 @@ import {
   buildAlert,
   controlLabel,
   ctaAction,
+  currentAlert,
   dataTier,
   districtName,
   documentLanguage,
@@ -417,4 +418,38 @@ test("documentLanguage reflects the selected language, not always English (#39)"
 test("documentLanguage falls back to English for an unknown language", () => {
   assert.deepEqual(documentLanguage("fr"), { lang: "en", dir: "ltr" });
   assert.deepEqual(documentLanguage(undefined), { lang: "en", dir: "ltr" });
+});
+
+test("an alert is replaced by the stale notice once the reading ages out", () => {
+  // The tier is re-derived on every render, but the alert text is built once at
+  // fetch time. A reading that is live when fetched and stale later must not keep
+  // showing or speaking the live warning (#110).
+  const now = Date.parse("2026-01-01T00:00:00Z");
+  const issued = new Date(now - 5 * 60 * 60 * 1000).toISOString();
+  const body = {
+    district: "nowshera",
+    risk: "high",
+    severity: "SEVERITY_ALERT",
+    source: "google-flood-forecasting",
+    issuedTime: issued,
+    forecastTrend: "RISING",
+  };
+
+  const parsed = parseStatusResponse("nowshera", body, now);
+  assert.equal(parsed.tier, "live");
+  assert.match(parsed.alert.en, /Move your family/);
+
+  const laterTier = presentationTier(body, now + 2 * 60 * 60 * 1000);
+  assert.equal(laterTier, "stale");
+  const alert = currentAlert(parsed.alert, laterTier);
+  assert.equal(alert, STALE_NOTICE);
+  assert.equal(alertSpeech("ready", alert, "en"), STALE_NOTICE.en);
+  assert.doesNotMatch(alertSpeech("ready", alert, "en"), /Move your family/);
+});
+
+test("currentAlert leaves a current alert untouched", () => {
+  const live = buildAlert("nowshera", "high");
+  assert.equal(currentAlert(live, "live"), live);
+  assert.equal(currentAlert(live, "simulated"), live);
+  assert.equal(currentAlert(null, "live"), null);
 });
