@@ -360,7 +360,7 @@ test("subscribe copy exists for every UI language and never reuses the English s
   for (const { key } of LANGUAGES) {
     const copy = SUBSCRIBE_COPY[key];
     assert.ok(copy, `missing SUBSCRIBE_COPY.${key}`);
-    for (const field of ["input", "invalid", "submit"]) {
+    for (const field of ["input", "invalid", "submit", "demo"]) {
       assert.equal(typeof copy[field], "string");
       assert.ok(copy[field].trim().length > 0, `empty ${key}.${field}`);
     }
@@ -369,6 +369,10 @@ test("subscribe copy exists for every UI language and never reuses the English s
   // otherwise a Pashto screen-reader user hears an unrelated label.
   assert.notEqual(SUBSCRIBE_COPY.ps.input, SUBSCRIBE_COPY.en.input);
   assert.notEqual(SUBSCRIBE_COPY.ps.invalid, SUBSCRIBE_COPY.en.invalid);
+  // The demo-only disclosure is the one sentence telling a user the number was
+  // not saved; in English it is unreadable to the audience it exists for.
+  assert.notEqual(SUBSCRIBE_COPY.ps.demo, SUBSCRIBE_COPY.en.demo);
+  assert.notEqual(SUBSCRIBE_COPY.roman.demo, SUBSCRIBE_COPY.en.demo);
 });
 
 test("every UI language declares a BCP-47 lang tag", () => {
