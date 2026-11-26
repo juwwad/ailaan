@@ -552,10 +552,7 @@ export default function Hero() {
                   className="flex items-start gap-1.5 text-xs font-semibold text-risk-low"
                 >
                   <CheckCircle2 size={14} className="mt-px shrink-0" />
-                  <span>
-                    Demo only — this form doesn&rsquo;t send anything yet. A real
-                    WhatsApp sign-up is coming soon.
-                  </span>
+                  <span>{subscribeCopy.demo}</span>
                 </p>
               )}
             </div>
