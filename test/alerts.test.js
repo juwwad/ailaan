@@ -22,6 +22,7 @@ import {
   districtName,
   documentLanguage,
   isStale,
+  liveAlarm,
   parseStatusResponse,
   presentationTier,
   readingLine,
@@ -30,6 +31,7 @@ import {
   trendLabel,
 } from "../lib/alerts.js";
 import { DISTRICT_KEYS, DISTRICTS } from "../lib/districts.js";
+import { simulatedStatus } from "../lib/floodStatus.js";
 
 test("every demo district is a real district, and vice versa", () => {
   assert.deepEqual([...DEMO_DISTRICTS].sort(), [...DISTRICT_KEYS].sort());
@@ -311,6 +313,21 @@ test("riskPresentation is neutral before a reading and unknown once one arrives"
   assert.deepEqual(riskPresentation(null, null), { risk: NEUTRAL_RISK, iconKey: null });
   // A ready reading with no recognised risk is unknown, never a green all-clear.
   assert.deepEqual(riskPresentation("live", null), { risk: UNKNOWN_RISK, iconKey: null });
+});
+
+test("only a live reading may use the pulsing ring and a coloured chip (#118)", () => {
+  // Colour and motion are the warning for a non-literate user, so the live-only
+  // affordances must not be borrowed by simulated or stale data.
+  assert.equal(liveAlarm("live"), true);
+  assert.equal(liveAlarm("simulated"), false);
+  assert.equal(liveAlarm("stale"), false);
+  assert.equal(liveAlarm(null), false);
+  assert.equal(liveAlarm(undefined), false);
+
+  // A simulated "high" reading is a real case: it must not paint a chip dot.
+  const simulated = simulatedStatus("nowshera");
+  assert.equal(riskFromStatus(simulated), "high");
+  assert.equal(liveAlarm(presentationTier(simulated)), false);
 });
 
 test("a stale live reading is never spoken or shown as a current warning (#74)", () => {
