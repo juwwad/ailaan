@@ -26,6 +26,7 @@ import {
   ctaAction,
   districtName,
   documentLanguage,
+  liveAlarm,
   parseStatusResponse,
   pickVoice,
   presentationTier,
@@ -126,9 +127,9 @@ export default function Hero() {
       setDemo(result);
       setRisks((prev) => ({
         ...prev,
-        // A stale reading must not paint the chip with a live risk colour.
-        [key]:
-          result.tier === "stale" ? null : riskFromStatus(result.statusBody),
+        // Only a live reading may paint the chip: a stale or simulated reading
+        // must not leave a risk-coloured dot with no "sample" marker next to it.
+        [key]: liveAlarm(result.tier) ? riskFromStatus(result.statusBody) : null,
       }));
     } catch {
       // Never fall back to a fabricated warning — the card stays neutral and
@@ -378,7 +379,7 @@ export default function Hero() {
             <div className="flex items-center gap-3">
               <div
                 className={`relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full sm:h-20 sm:w-20 ${
-                  isReady && tier !== "stale" ? "risk-pulse" : ""
+                  liveAlarm(tier) ? "risk-pulse" : ""
                 }`}
                 style={{
                   background: `${risk.color}26`,
