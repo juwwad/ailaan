@@ -522,7 +522,7 @@ export default function Hero() {
                     aria-label={subscribeCopy.input}
                     aria-invalid={phoneError}
                     aria-describedby={phoneError ? "subscribe-error" : undefined}
-                    className={`min-w-0 flex-1 rounded-full border bg-white/5 px-3 py-1.5 text-xs text-mist placeholder:text-mist/35 outline-none focus:border-signal/60 ${
+                    className={`min-w-0 flex-1 rounded-full border bg-white/5 px-3 py-1.5 text-xs text-mist placeholder:text-mist/35 focus:border-signal/60 ${
                       phoneError ? "border-risk-high/70" : "border-white/15"
                     }`}
                   />
