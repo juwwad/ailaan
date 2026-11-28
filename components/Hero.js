@@ -103,7 +103,11 @@ export default function Hero() {
     });
     const responseData = await response.json();
     if (!response.ok) {
-      throw new Error(responseData?.error || "Request failed");
+      // Carry the status into the view state: a 429 means "slow down", not "the
+      // warning service is down", and the two must not share the outage copy.
+      const error = new Error(responseData?.error || "Request failed");
+      error.status = response.status;
+      throw error;
     }
     // Distinguishes "unreadable body" (fail safe) from "readable body with an
     // unrecognised risk" (render the honest unknown-risk state) — see #53.
@@ -130,11 +134,15 @@ export default function Hero() {
         [key]:
           result.tier === "stale" ? null : riskFromStatus(result.statusBody),
       }));
-    } catch {
+    } catch (error) {
       // Never fall back to a fabricated warning — the card stays neutral and
-      // the box explains that nothing was read.
+      // the box explains that nothing was read. A 429 is its own state: the
+      // service answered, the caller was throttled (#120).
       if (!isCurrent()) return;
-      setDemo({ status: "error", alert: null });
+      setDemo({
+        status: error?.status === 429 ? "rate-limited" : "error",
+        alert: null,
+      });
     }
   }, []);
 
@@ -173,8 +181,12 @@ export default function Hero() {
   useEffect(() => {
     // Speak on arrival of a reading, and also when a CTA-triggered load fails:
     // the CTA is the audio path for non-literate users, so it must not end in
-    // silence (#67).
-    if ((demo.status === "ready" || demo.status === "error") && autoSpeakRef.current) {
+    // silence (#67, #120).
+    const speakableState =
+      demo.status === "ready" ||
+      demo.status === "error" ||
+      demo.status === "rate-limited";
+    if (speakableState && autoSpeakRef.current) {
       autoSpeakRef.current = false;
       speak();
     }
@@ -464,6 +476,24 @@ export default function Hero() {
                     className="flex items-center gap-1 font-semibold text-signal-soft hover:text-mist"
                   >
                     <RefreshCw size={12} /> Retry
+                  </button>
+                </span>
+              )}
+              {demo.status === "rate-limited" && (
+                <span className="flex flex-col items-start gap-1.5">
+                  <span className="flex items-start gap-1.5 text-mist/70">
+                    <AlertTriangle size={14} className="mt-px shrink-0 text-risk-medium" />
+                    <span>
+                      Too many checks in a short time. Nothing has been read for
+                      this district yet — this is not an all-clear. Please wait a
+                      minute, then try again.
+                    </span>
+                  </span>
+                  <button
+                    onClick={() => load(selected)}
+                    className="flex items-center gap-1 font-semibold text-signal-soft hover:text-mist"
+                  >
+                    <RefreshCw size={12} /> Try again
                   </button>
                 </span>
               )}
